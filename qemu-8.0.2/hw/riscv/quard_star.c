@@ -37,13 +37,13 @@ static const MemMapEntry quard_star_memmap[] = {
     [QUARD_STAR_MROM]  = {        0x0,        0x8000 },   
     [QUARD_STAR_SRAM]  = {     0x8000,        0x8000 },
     [QUARD_STAR_CLINT] = { 0x02000000,       0x10000 },
-    [QUARD_STAR_PLIC]  = { 0x0c000000,     QUARD_STAR_PLIC_SIZE(QUARD_STAR_CPUS_MAX * 2) },
-    [QUARD_STAR_UART0] = { 0x10000000,         0x100 },
-    [QUARD_STAR_UART1] = { 0x10001000,         0x100 },
-    [QUARD_STAR_UART2] = { 0x10002000,         0x100 },
+    [QUARD_STAR_PLIC]  = { 0x0c000000,      0x210000 },
+    [QUARD_STAR_UART0] = { 0x10000000,         0x1000 },
+    [QUARD_STAR_UART1] = { 0x10001000,         0x1000 },
+    [QUARD_STAR_UART2] = { 0x10002000,         0x1000 },
     [QUARD_STAR_RTC]   = { 0x10003000,        0x1000 },
-    [QUARD_STAR_FLASH] = { 0x20000000,     0x2000000 },   
-    [QUARD_STAR_DRAM]  = { 0x80000000,          0x80 },   
+    [QUARD_STAR_FLASH] = { 0x20000000,    0x2000000 },   
+    [QUARD_STAR_DRAM]  = { 0x80000000,    0x40000000 },   
 };
 
 /*创建CPU */
@@ -250,6 +250,8 @@ static void quard_star_machine_init(MachineState *machine)
     quard_star_serial_create(machine);
     //创建 RTC
     quard_star_rtc_create(machine);
+    // 创建串口设备
+    quard_star_serial_create(machine);
 }
 
 static void quard_star_machine_instance_init(Object *obj)
