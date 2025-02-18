@@ -53,6 +53,22 @@ $CROSS_PREFIX-gcc -nostartfiles -T./link.lds -Wl,-Map=$SHELL_FOLDER/output/trust
 $CROSS_PREFIX-objcopy -O binary -S $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf $SHELL_FOLDER/output/trusted_domain/trusted_fw.bin
 $CROSS_PREFIX-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf > $SHELL_FOLDER/output/trusted_domain/trusted_fw.lst
 
+# 编译uboot
+if [ ! -d "$SHELL_FOLDER/output/uboot" ]; then  
+mkdir $SHELL_FOLDER/output/uboot
+fi  
+cd $SHELL_FOLDER/u-boot-v2023.04
+make CROSS_COMPILE=riscv64-unknown-linux-gnu- qemu-riscv64_smode_defconfig
+make CROSS_COMPILE=riscv64-unknown-linux-gnu-  -j16
+cp $SHELL_FOLDER/u-boot-v2023.04/u-boot $SHELL_FOLDER/output/uboot/u-boot.elf
+cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.map $SHELL_FOLDER/output/uboot/u-boot.map
+cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.bin $SHELL_FOLDER/output/uboot/u-boot.bin
+riscv64-unknown-linux-gnu-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/uboot/u-boot.elf > $SHELL_FOLDER/output/uboot/u-boot.lst
+
+# 生成uboot.dtb
+cd $SHELL_FOLDER/dts
+dtc -I dts -O dtb -o $SHELL_FOLDER/output/uboot/quard_star_uboot.dtb quard_star_uboot.dts
+
 
 # 合成firmware固件
 if [ ! -d "$SHELL_FOLDER/output/fw" ]; then  
