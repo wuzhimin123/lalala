@@ -224,7 +224,7 @@ static void quard_star_serial_create(MachineState *machine)
     serial_mm_init(system_memory, quard_star_memmap[QUARD_STAR_UART2].base,
         0, qdev_get_gpio_in(DEVICE(s->plic[0]), QUARD_STAR_UART2_IRQ), 399193,
         serial_hd(2), DEVICE_LITTLE_ENDIAN);
-}
+ }
 /* 创建 RTC */
 static void quard_star_rtc_create(MachineState *machine)
 {    
@@ -250,8 +250,6 @@ static void quard_star_machine_init(MachineState *machine)
     quard_star_serial_create(machine);
     //创建 RTC
     quard_star_rtc_create(machine);
-    // 创建串口设备
-    quard_star_serial_create(machine);
 }
 
 static void quard_star_machine_instance_init(Object *obj)
