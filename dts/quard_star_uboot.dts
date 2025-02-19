@@ -7,58 +7,13 @@
 	model = "riscv-quard-star,qemu";
 
 	chosen {
+		bootargs = "console=ttyS0";
 		stdout-path = "/soc/uart0@10000000";
-
-		opensbi-domains {  /* 定义opensbi-domains描述节点 */
-		    compatible = "opensbi,domain,config"; /* 节点名称 */
-
-            tmem: tmem {   /* 定义内存节点 */
-                compatible = "opensbi,domain,memregion";  /* 节点名称 */
-                base = <0x0 0xb0000000>; /* 起始地址注意64位地址哦 */
-                order = <28>; /* 内存大小即size=2^28 */
-            };
-
-            tuart: tuart {  /* 定义mmio节点 */
-                compatible = "opensbi,domain,memregion";  /* 节点名称 */
-                base = <0x0 0x10002000>; /* 起始地址 */
-                order = <8>; /* size=2^8 */
-                mmio;  /* mmio属性 */
-                devices = <&uart2>; /* 关联到设备节点上 */
-            };
-
-		    allmem: allmem { /* 定义内存节点，这个节点保护所有地址 */
-		        compatible = "opensbi,domain,memregion";
-		        base = <0x0 0x0>;
-		        order = <64>;
-		    };
-
-            tdomain: trusted-domain { /* 定义domian节点 */
-                compatible = "opensbi,domain,instance";  /* 节点名称 */
-                possible-harts = <&cpu7>; /* dumian中允许使用的cpu core */
-                regions = <&tmem 0x7>, <&tuart 0x7>, <&allmem 0x7>;/* 各个内存/mmio区域的权限，3bit读写运行权限 0x7拥有全部权限 */
-                boot-hart = <&cpu7>; /* domian中用于boot的core */
-                next-arg1 = <0x0 0x00000000>; /* 传递给下级程序的参数 */
-		        next-addr = <0x0 0xb0000000>; /* 完成domain初始化后跳转到下级程序的起始地址 */
-		        next-mode = <0x0>; /* 下级程序的允许模式 0为U模式，1为S模式 */
-                system-reset-allowed; /* 允许复位 */
-            };
-
-		    udomain: untrusted-domain {
-		        compatible = "opensbi,domain,instance";
-		        possible-harts = <&cpu0 &cpu1 &cpu2 &cpu3 &cpu4 &cpu5 &cpu6>;
-		        regions = <&tmem 0x0>, <&tuart 0x0>, <&allmem 0x7>;
-				boot-hart = <&cpu0>;
-		        next-arg1 = <0x0 0x82000000>;/* 这两个地址之所以改为这个原因是因为默认的riscv64_smode_defconfig配置uboot使用了这两个地址，我们先使用默认配置跑起来uboot，后续会重新规划内存分配 */
-		        next-addr = <0x0 0x80200000>;
-		        next-mode = <0x1>;
-		        system-reset-allowed;
-		    };
-		};
 	};
 
 	memory@80000000 {
 		device_type = "memory";
-		reg = <0x0 0x80000000 0x0 0x40000000>;
+		reg = <0x0 0x80000000 0x0 0x30000000>;
 	};
 
 	cpus {
@@ -72,7 +27,6 @@
 			reg = <0x0>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&udomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -90,7 +44,6 @@
 			reg = <0x1>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&udomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -108,7 +61,6 @@
 			reg = <0x2>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&udomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -126,7 +78,6 @@
 			reg = <0x3>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&udomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -144,7 +95,6 @@
 			reg = <0x4>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&udomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -162,7 +112,6 @@
 			reg = <0x5>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&udomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -180,7 +129,6 @@
 			reg = <0x6>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&udomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -198,7 +146,6 @@
 			reg = <0x7>;
 			status = "okay";
 			compatible = "riscv";
-			opensbi-domain = <&tdomain>;
 			riscv,isa = "rv64imafdcsu";
 			mmu-type = "riscv,sv48";
 
@@ -268,14 +215,6 @@
 			interrupt-parent = <0x11>;
 			clock-frequency = <0x384000>;
 			reg = <0x0 0x10001000 0x0 0x1000>;
-			compatible = "ns16550a";
-		};
-
-        uart2: uart2@10002000 {
-			interrupts = <0xa>;
-			interrupt-parent = <0x11>;
-			clock-frequency = <0x384000>;
-			reg = <0x0 0x10002000 0x0 0x1000>;
 			compatible = "ns16550a";
 		};
 
