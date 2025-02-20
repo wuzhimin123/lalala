@@ -38,7 +38,7 @@
                 regions = <&tmem 0x7>, <&tuart 0x7>, <&allmem 0x7>;/* 各个内存/mmio区域的权限，3bit读写运行权限 0x7拥有全部权限 */
                 boot-hart = <&cpu7>; /* domian中用于boot的core */
                 next-arg1 = <0x0 0x00000000>; /* 传递给下级程序的参数 */
-		        next-addr = <0x0 0xb0000000>; /* 完成domain初始化后跳转到下级程序的起始地址 */
+		        next-addr = <0x0 0xb0000000>; /* 完成domain初始化后跳转到下级程序的起始地址 ,这是另一个cpu core，也就是说两个core运行两个domain*/
 		        next-mode = <0x0>; /* 下级程序的允许模式 0为U模式，1为S模式 */
                 system-reset-allowed; /* 允许复位 */
             };
