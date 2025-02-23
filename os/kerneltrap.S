@@ -60,8 +60,8 @@ __alltraps:
 __restore:
     # case1: start running app by __restore
     # case2: back to U after handling trap
-    #sp指向内核栈中pt_regs结构体起始位置
-    mv sp, a0
+    # sp指向内核栈中pt_regs结构体起始位置
+    # mv sp, a0
     # now sp->kernel stack(after allocated), sscratch->user stack
     # restore sstatus/sepc
     ld t0, 32*8(sp)
@@ -109,5 +109,5 @@ __restore:
     # now sp->kernel stack, sscratch->user stack
     #sp指向用户栈
     csrrw sp, sscratch, sp
-    #返回spec中的地址
+    # 返回spec中的地址，第一次swtich后__restore sret到task1，随后
     sret

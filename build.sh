@@ -52,18 +52,26 @@ $CROSS_PREFIX-gcc -x assembler-with-cpp -c startup.s -o $SHELL_FOLDER/output/tru
 $CROSS_PREFIX-gcc -nostartfiles -T./link.lds -Wl,-Map=$SHELL_FOLDER/output/trusted_domain/trusted_fw.map -Wl,--gc-sections $SHELL_FOLDER/output/trusted_domain/startup.o -o $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf
 $CROSS_PREFIX-objcopy -O binary -S $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf $SHELL_FOLDER/output/trusted_domain/trusted_fw.bin
 $CROSS_PREFIX-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf > $SHELL_FOLDER/output/trusted_domain/trusted_fw.lst
+# if [ ! -d "$SHELL_FOLDER/output/trusted_domain" ]; then  
+# mkdir $SHELL_FOLDER/output/trusted_domain
+# fi  
+# cd $SHELL_FOLDER/trusted_domain
+# make CROSS_COMPILE=$CROSS_PREFIX- clean
+# make CROSS_COMPILE=$CROSS_PREFIX- 
+# cp ./build/trusted_fw.* $SHELL_FOLDER/output/trusted_domain/
+# rm -rf ./build/
 
 # 编译uboot
-if [ ! -d "$SHELL_FOLDER/output/uboot" ]; then  
-mkdir $SHELL_FOLDER/output/uboot
-fi  
-cd $SHELL_FOLDER/u-boot-v2023.04
-make CROSS_COMPILE=/home/wzm/llvm/riscv/bin/riscv64-unknown-linux-gnu- qemu-riscv64_smode_defconfig
-make CROSS_COMPILE=/home/wzm/llvm/riscv/bin/riscv64-unknown-linux-gnu-  -j16
-cp $SHELL_FOLDER/u-boot-v2023.04/u-boot $SHELL_FOLDER/output/uboot/u-boot.elf
-cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.map $SHELL_FOLDER/output/uboot/u-boot.map
-cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.bin $SHELL_FOLDER/output/uboot/u-boot.bin
-riscv64-unknown-linux-gnu-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/uboot/u-boot.elf > $SHELL_FOLDER/output/uboot/u-boot.lst
+# if [ ! -d "$SHELL_FOLDER/output/uboot" ]; then  
+# mkdir $SHELL_FOLDER/output/uboot
+# fi  
+# cd $SHELL_FOLDER/u-boot-v2023.04
+# make CROSS_COMPILE=/home/wzm/llvm/riscv/bin/riscv64-unknown-linux-gnu- qemu-riscv64_smode_defconfig
+# make CROSS_COMPILE=/home/wzm/llvm/riscv/bin/riscv64-unknown-linux-gnu-  -j16
+# cp $SHELL_FOLDER/u-boot-v2023.04/u-boot $SHELL_FOLDER/output/uboot/u-boot.elf
+# cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.map $SHELL_FOLDER/output/uboot/u-boot.map
+# cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.bin $SHELL_FOLDER/output/uboot/u-boot.bin
+# riscv64-unknown-linux-gnu-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/uboot/u-boot.elf > $SHELL_FOLDER/output/uboot/u-boot.lst
 
 # 生成uboot.dtb
 cd $SHELL_FOLDER/dts

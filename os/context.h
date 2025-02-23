@@ -1,7 +1,9 @@
 #ifndef __CONTEXT_H__
 #define __CONTEXT_H__
 #include "os.h"
-typedef struct pt_regs
+
+/*Trap上下文保存结构体*/
+typedef struct TrapContext
 {
     reg_t x0;
 	reg_t ra;
@@ -38,6 +40,26 @@ typedef struct pt_regs
 	/* S模式下的寄存器 */
 	reg_t sstatus;
 	reg_t sepc;
-}pt_regs;
+}TrapContext;
+
+/*S模式任务上下文*/
+typedef struct TaskContext
+{
+	reg_t ra;
+	reg_t sp;
+	reg_t s0;
+	reg_t s1;
+	reg_t s2;
+	reg_t s3;
+	reg_t s4;
+	reg_t s5;
+	reg_t s6;
+	reg_t s7;
+	reg_t s8;
+	reg_t s9;
+	reg_t s10;
+	reg_t s11;
+}TaskContext;
+
 
 #endif

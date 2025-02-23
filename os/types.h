@@ -7,4 +7,9 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 
 typedef uint64_t reg_t;
+
+#define EOF -1  
+#define NULL ((void *)0)
+#define EOS '\0'
+
 #endif
