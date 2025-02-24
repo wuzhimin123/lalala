@@ -33,3 +33,8 @@ void __sys_yield()
 {
     schedule();
 }
+
+uint64_t __sys_gettime()
+{
+    return get_time_us();
+}

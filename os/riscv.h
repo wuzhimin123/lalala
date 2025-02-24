@@ -53,4 +53,31 @@ static inline reg_t r_stvec()
     return x;
 }
 
+#define SIE_SEIE (1L << 9)
+#define SIE_STIE (1L << 5)
+#define SIE_SSIE (1L << 1)
+
+/*volatile告诉编译器不要对这段代码优化,"=r"表示将结果存储到通用寄存器，
+(x)表示将通用寄存器的值赋给变量x*/
+static inline reg_t r_sie()
+{
+    reg_t x;
+    asm volatile("csrr %0,sie": "=r" (x));
+    return x;
+}
+
+static inline void w_sie(reg_t x)
+{
+  asm volatile("csrw sie, %0" : : "r" (x));
+}
+/*rdtime是opensbi提供的伪指令，读取mtime的值，在opensbi源码中找到*/
+static inline reg_t r_mtime()
+{
+  reg_t x;
+  asm volatile("rdtime %0" : "=r"(x));
+  // asm volatime("csrr %0, 0x0C01" : "=r" (x) )
+  return x;
+}
+
+
 #endif

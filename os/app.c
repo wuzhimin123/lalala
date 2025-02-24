@@ -33,23 +33,15 @@ size_t sys_yield()
     syscall(__NR_sched_yield,0,0,0);
 }
 
-void testsys_write()
-{
-    const char *message = "Hello,Zhang Ye!\n";
-    int len = strlen(message);
-    int ret = sys_write(1,message,len);
-
-    sys_yield();
-    while(1)
-    {
-
-    }
-}
-
 void task_delay(volatile int count)
 {
     count *=50000;
     while(count--);
+}
+
+uint64_t sys_gettime()
+{
+    return syscall(__NR_gettimeofday,0,0,0);
 }
 
 void task1()
@@ -59,8 +51,6 @@ void task1()
     while(1)
     {
         sys_write(1,message,len);
-        task_delay(10000);
-        sys_yield();
     }
 }
 
@@ -70,9 +60,7 @@ void task2()
     int len = strlen(message);
     while(1)
     {
-        sys_write(1,message,len);
-        task_delay(10000);
-        sys_yield();
+        sys_write(1,message,len); 
     }
 }
 
@@ -83,8 +71,6 @@ void task3()
     while(1)
     {
         sys_write(1,message,len);
-        task_delay(10000);
-        sys_yield();
     }
 }
 
