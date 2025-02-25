@@ -1,4 +1,4 @@
-#include "os.h"
+#include <timeros/os.h>
 
 
 void __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {

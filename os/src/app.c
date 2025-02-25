@@ -1,7 +1,5 @@
-#include <stddef.h>
-#include "os.h"
-#include "context.h"
-#include "string.h"
+#include <timeros/os.h>
+
 
 
 
@@ -23,12 +21,12 @@ size_t syscall(size_t id, reg_t arg1, reg_t arg2, reg_t arg3) {
     return ret;
 }
 
-size_t sys_write(size_t fd, const char *buf, size_t len)
+uint64_t sys_write(size_t fd, const char *buf, size_t len)
 {
     syscall(__NR_write, fd, buf, len);
 }
 
-size_t sys_yield()
+uint64_t sys_yield()
 {
     syscall(__NR_sched_yield,0,0,0);
 }

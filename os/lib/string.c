@@ -1,4 +1,4 @@
-#include "os.h"
+#include <timeros/string.h>
 
 //计算字符串的长度 
 size_t strlen(const char *str)
@@ -18,6 +18,16 @@ void* memcpy(void *dest, const void *src, size_t count)
     while (count--)
     {
         *ptr++ = *((char *)(src++));
+    }
+    return dest;
+}
+
+void* memset(void *dest, int ch, size_t count)
+{
+    char *ptr = dest;
+    while (count--)
+    {
+        *ptr++ = ch;//指针移动一个字节的距离
     }
     return dest;
 }

@@ -73,9 +73,9 @@ $CROSS_PREFIX-objdump --source --demangle --disassemble --reloc --wide $SHELL_FO
 # cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.bin $SHELL_FOLDER/output/uboot/u-boot.bin
 # riscv64-unknown-linux-gnu-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/uboot/u-boot.elf > $SHELL_FOLDER/output/uboot/u-boot.lst
 
-# 生成uboot.dtb
-cd $SHELL_FOLDER/dts
-dtc -I dts -O dtb -o $SHELL_FOLDER/output/uboot/quard_star_uboot.dtb quard_star_uboot.dts
+# # 生成uboot.dtb
+# cd $SHELL_FOLDER/dts
+# dtc -I dts -O dtb -o $SHELL_FOLDER/output/uboot/quard_star_uboot.dtb quard_star_uboot.dts
 
 # 编译os
 if [ ! -d "$SHELL_FOLDER/output/os" ]; then  
