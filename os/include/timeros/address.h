@@ -35,4 +35,20 @@ typedef struct {
 typedef struct {
     uint64_t value;
 } VirtPageNum;
+
+/*定义页表项*/
+typedef struct{
+    uint64_t bits;
+}PageTableEntry;
+
+// 定义位掩码常量
+#define PTE_V (1 << 0)   //有效位
+#define PTE_R (1 << 1)   //可读属性
+#define PTE_W (1 << 2)   //可写属性
+#define PTE_X (1 << 3)   //可执行属性
+#define PTE_U (1 << 4)   //用户访问模式
+#define PTE_G (1 << 5)   //全局映射
+#define PTE_A (1 << 6)   //访问标志位
+#define PTE_D (1 << 7)   //脏位
+
 #endif
