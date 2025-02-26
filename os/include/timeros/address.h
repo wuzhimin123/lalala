@@ -15,6 +15,8 @@
 
 #define MEMORY_END 0x80800000   //0x80200000-0x80800000
 #define MEMORY_START 0x80400000
+#define KERNBASE 0x80200000L  
+#define PHYSTOP (KERNBASE + 128*1024*1024)
 
 /* 物理地址 */
 typedef struct {
@@ -41,6 +43,12 @@ typedef struct{
     uint64_t bits;
 }PageTableEntry;
 
+/*定义页表*/
+typedef struct
+{
+    PhysPageNum root_ppn;//根节点物理页号
+}PageTable;
+
 // 定义位掩码常量
 #define PTE_V (1 << 0)   //有效位
 #define PTE_R (1 << 1)   //可读属性
@@ -50,5 +58,8 @@ typedef struct{
 #define PTE_G (1 << 5)   //全局映射
 #define PTE_A (1 << 6)   //访问标志位
 #define PTE_D (1 << 7)   //脏位
+
+#define SATP_SV39 (8L << 60) //设置satp寄存器的模式为SV39模式
+#define MAKE_SATP(pagetable) (SATP_SV39 | (((u64)pagetable)))
 
 #endif

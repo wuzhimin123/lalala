@@ -1,4 +1,6 @@
 #include <timeros/address.h>
+extern char etext[];
+extern char kernelend[];
 
 /*u64转化为物理地址*/
 PhysAddr phys_addr_from_size_t(uint64_t v)
@@ -147,6 +149,7 @@ typedef struct
     uint64_t end;     //空闲内存的结束物理页号
     Stack recycled;   //回收的物理页号
 }StackFrameAllocator;
+
 /*创建StackFrameAllocator实例*/
 void StackFrameAllocator_new(StackFrameAllocator *allocator)
 {
@@ -154,12 +157,14 @@ void StackFrameAllocator_new(StackFrameAllocator *allocator)
     allocator->end = 0;
     initStack(&allocator->recycled);
 }
+
 /*初始化为可用物理页号区间*/
 void StackFrameAllocator_init(StackFrameAllocator *allocator,PhysPageNum l,PhysPageNum r)
 {
     allocator->current = l.value;
     allocator->end = r.value;
 }
+
 /*物理页分配*/
 PhysPageNum StackFrameAllocator_alloc(StackFrameAllocator *allocator)
 {
@@ -203,7 +208,21 @@ void StackFrameAllocator_dealloc(StackFrameAllocator *allocator, PhysPageNum ppn
 }
 
 StackFrameAllocator FrameAllocatorImpl;
-extern char kernelend[];
+
+
+/*内存分配器初始化，空闲页表从0x80250000开始*/
+void frame_alloctor_init()
+{
+    // 初始化时 kernelend 需向上取整,因为可能起始地址不是一个完整的页的开头，内存管理混乱
+    StackFrameAllocator_new(&FrameAllocatorImpl);
+    StackFrameAllocator_init(&FrameAllocatorImpl, \
+            ceil_phys(phys_addr_from_size_t(kernelend)), \
+            ceil_phys(phys_addr_from_size_t(PHYSTOP)));
+    printk("Memoery start:%p\n",kernelend);
+    printk("Memoery end:%p\n",PHYSTOP);
+}
+
+
 
 /*获取虚拟页号(虚拟地址的那27位页号)的三级索引*/
 void indexes(VirtPageNum vpn,size_t* result)
@@ -219,13 +238,6 @@ void indexes(VirtPageNum vpn,size_t* result)
         result[i] = idx[i];
 }
 
-/*定义页表*/
-typedef struct
-{
-    PhysPageNum root_ppn;//根节点物理页号
-    Stack frames;       //保存页表所有节点所在的页帧（页表号）
-}PageTable;
-
 /* 分配一页内存 */
 PhysPageNum kalloc(void)
 {
@@ -240,7 +252,7 @@ void kfree(PhysPageNum ppn)
     StackFrameAllocator_dealloc(&FrameAllocatorImpl,ppn);
 }
 
-//根据虚拟地址和一级页表索引到三级页表的页表项
+//根据虚拟地址和一级页表索引到三级页表的页表项(索引不到可自行创建，因此即使根页表为空也可实现映射)
 PageTableEntry *find_pte_create(PageTable* pt,VirtPageNum vpn)
 {
     //虚拟页号的三级索引保存到idx
@@ -298,24 +310,88 @@ PageTableEntry* find_pte(PageTable* pt, VirtPageNum vpn)
     
 }
 
-//将物理页号与虚拟地址索引的三级页表中的页表项映射起来
-void PageTable_map(PageTable* pt,VirtPageNum vpn,PhysPageNum ppn,uint8_t pteflgs)
+//将物理页号与虚拟地址索引的三级页表中的页表项映射起来，最终实现va和pa的映射
+void PageTable_map(PageTable* pt,VirtAddr va,PhysAddr pa,u64 size,uint8_t pteflgs)
 {
+    if(size == 0)
+        panic("mappages:size");
+    //取页表号
+    PhysPageNum ppn = floor_phys(pa);
+    VirtPageNum vpn = floor_virts(va);
+    //取需要分配到哪个页表号，-1有作用，若不减一，va.value为0，size为4096，则last为1，实际上第0页足够分配
+    u64 last = (va.value + size - 1)/PAGE_SIZE;
+    //一页一页分配
+    for(;;)
+    {
+        PageTableEntry* pte = find_pte_create(pt,vpn);
+        assert(!PageTableEntry_is_valid(pte));
+        *pte = PageTableEntry_new(ppn,PTE_V|pteflgs);
+
+        if(vpn.value == last)
+            break;
+        vpn.value += 1;
+        ppn.value += 1;
+    }
     
-    PageTableEntry* pte = find_pte_create(pt,vpn);
-    assert(!PageTableEntry_is_valid(pte));
-    *pte = PageTableEntry_new(ppn,PTE_V|pteflgs);
 }
 
 //取消映射
 void PageTable_unmap(PageTable* pt,VirtPageNum vpn)
 {
+    
     PageTableEntry* pte = find_pte(pt,vpn);
     assert(!PageTableEntry_is_valid(pte));
     //设为空
     *pte = PageTableEntry_empty();
 }
 
+/*内核代码段数据段恒等映射，得到映射的根页表*/
+PageTable kvmmake(void)
+{
+    PageTable pt;
+    //分配一个空闲页表作为根页表(一级页表)
+    PhysPageNum root_ppn = StackFrameAllocator_alloc(&FrameAllocatorImpl);
+    pt.root_ppn = root_ppn;
+    printk("root_ppn:%p\n",phys_addr_from_phys_page_num(root_ppn));
+
+    printk("etext:%p\n",(u64)etext);
+    //实现内核text段恒等映射,可读可执行,u模式不可访问。(etext在链接脚本文件中定义)
+    PageTable_map(&pt,virt_addr_from_size_t(KERNBASE),phys_addr_from_size_t(KERNBASE), \
+                    (u64)etext - KERNBASE, PTE_R|PTE_X);
+    printk("finish kernel text map!\n");
+    //实现内核data段恒等映射，可读可写，u模式不可访问
+    PageTable_map(&pt,virt_addr_from_size_t((u64)etext),phys_addr_from_size_t((u64)etext), \
+                    PHYSTOP - (u64)etext, PTE_R|PTE_W);
+    printk("finish kernel data and physical RAM map!\n");
+    return pt;
+}
+
+/*内核根页表放在0x80250000，根据这个页表可查到映射关系*/
+/*建立内核页表*/
+PageTable kernel_pagetable;
+void kvminit()
+{
+    kernel_pagetable = kvmmake();
+}
+
+/*写satp寄存器，清空快表。快表是MMU根据页表映射关系设置的，MMU会首先读快表，然后读根页表*/
+void kvminithart()
+{
+    // wait for any previous writes to the page table memory to finish.
+    //MAKE_SATP，启动SV39模式，并将根页表号写入(得到一个将要写入satp寄存器的值)
+    printk("satp:%lx\n",MAKE_SATP(kernel_pagetable.root_ppn.value));
+    sfence_vma();//第一次清空TLB是satp切换内容之前有旧的映射
+    //写入到satp寄存器
+    w_satp(MAKE_SATP(kernel_pagetable.root_ppn.value));
+  
+    // flush stale entries from the TLB.
+    sfence_vma();//第二次清空TLB是第一次清空和satp切换内容之间可能存在页表映射查找,MMU会在快表中记录
+    reg_t satp = r_satp();
+
+    printk("satp:%lx\n",satp);
+
+    
+}
 void frame_allocator_test()
 {
     PhysPageNum frame[10];
