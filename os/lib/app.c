@@ -1,9 +1,5 @@
 #include <timeros/os.h>
 
-
-
-
-
 /*系统调用，系统调用号和参数*/
 uint64_t syscall(size_t id, reg_t arg1, reg_t arg2, reg_t arg3) {
 
@@ -30,51 +26,17 @@ uint64_t sys_yield()
     syscall(__NR_sched_yield,0,0,0);
 }
 
-void task_delay(volatile int count)
-{
-    count *=50000;
-    while(count--);
-}
+// void task_delay(volatile int count)
+// {
+//     count *=50000;
+//     while(count--);
+// }
 
 uint64_t sys_gettime()
 {
     return syscall(__NR_gettimeofday,0,0,0);
 }
 
-void task1()
-{
-    const char *message = "task1 is running!\n";
-    int len = strlen(message);
-    while(1)
-    {
-        sys_write(1,message,len);
-    }
-}
 
-void task2()
-{
-    const char *message = "task2 is running!\n";
-    int len = strlen(message);
-    while(1)
-    {
-        sys_write(1,message,len); 
-    }
-}
 
-void task3()
-{
-    const char *message = "task3 is running!\n";
-    int len = strlen(message);
-    while(1)
-    {
-        sys_write(1,message,len);
-    }
-}
-
-void task_init(void)
-{
-    task_create(task1);
-    task_create(task2);
-    task_create(task3);
-}
 

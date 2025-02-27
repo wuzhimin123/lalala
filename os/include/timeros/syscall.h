@@ -2,7 +2,7 @@
 #include <stddef.h>
 
 /* syscall */
-void __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3);
+uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3);
 
 #define __NR_write 64
 #define __NR_sched_yield 124

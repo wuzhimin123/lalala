@@ -48,29 +48,21 @@ if [ ! -d "$SHELL_FOLDER/output/trusted_domain" ]; then
 mkdir $SHELL_FOLDER/output/trusted_domain
 fi  
 cd $SHELL_FOLDER/trusted_domain
-$CROSS_PREFIX-gcc -x assembler-with-cpp -c startup.s -o $SHELL_FOLDER/output/trusted_domain/startup.o
-$CROSS_PREFIX-gcc -nostartfiles -T./link.lds -Wl,-Map=$SHELL_FOLDER/output/trusted_domain/trusted_fw.map -Wl,--gc-sections $SHELL_FOLDER/output/trusted_domain/startup.o -o $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf
+$CROSS_PREFIX-gcc  -x assembler-with-cpp -c startup.s -o $SHELL_FOLDER/output/trusted_domain/startup.o
+$CROSS_PREFIX-gcc  -nostartfiles -T./link.lds -Wl,-Map=$SHELL_FOLDER/output/trusted_domain/trusted_fw.map -Wl,--gc-sections $SHELL_FOLDER/output/trusted_domain/startup.o -o $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf
 $CROSS_PREFIX-objcopy -O binary -S $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf $SHELL_FOLDER/output/trusted_domain/trusted_fw.bin
 $CROSS_PREFIX-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/trusted_domain/trusted_fw.elf > $SHELL_FOLDER/output/trusted_domain/trusted_fw.lst
-# if [ ! -d "$SHELL_FOLDER/output/trusted_domain" ]; then  
-# mkdir $SHELL_FOLDER/output/trusted_domain
-# fi  
-# cd $SHELL_FOLDER/trusted_domain
-# make CROSS_COMPILE=$CROSS_PREFIX- clean
-# make CROSS_COMPILE=$CROSS_PREFIX- 
-# cp ./build/trusted_fw.* $SHELL_FOLDER/output/trusted_domain/
-# rm -rf ./build/
 
-# 编译uboot
+# # 编译uboot
 # if [ ! -d "$SHELL_FOLDER/output/uboot" ]; then  
 # mkdir $SHELL_FOLDER/output/uboot
 # fi  
-# cd $SHELL_FOLDER/u-boot-v2023.04
-# make CROSS_COMPILE=/home/wzm/llvm/riscv/bin/riscv64-unknown-linux-gnu- qemu-riscv64_smode_defconfig
-# make CROSS_COMPILE=/home/wzm/llvm/riscv/bin/riscv64-unknown-linux-gnu-  -j16
-# cp $SHELL_FOLDER/u-boot-v2023.04/u-boot $SHELL_FOLDER/output/uboot/u-boot.elf
-# cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.map $SHELL_FOLDER/output/uboot/u-boot.map
-# cp $SHELL_FOLDER/u-boot-v2023.04/u-boot.bin $SHELL_FOLDER/output/uboot/u-boot.bin
+# cd $SHELL_FOLDER/u-boot-2023.04
+# make CROSS_COMPILE=riscv64-unknown-linux-gnu- qemu-riscv64_smode_defconfig
+# make CROSS_COMPILE=riscv64-unknown-linux-gnu-  -j16
+# cp $SHELL_FOLDER/u-boot-2023.04/u-boot $SHELL_FOLDER/output/uboot/u-boot.elf
+# cp $SHELL_FOLDER/u-boot-2023.04/u-boot.map $SHELL_FOLDER/output/uboot/u-boot.map
+# cp $SHELL_FOLDER/u-boot-2023.04/u-boot.bin $SHELL_FOLDER/output/uboot/u-boot.bin
 # riscv64-unknown-linux-gnu-objdump --source --demangle --disassemble --reloc --wide $SHELL_FOLDER/output/uboot/u-boot.elf > $SHELL_FOLDER/output/uboot/u-boot.lst
 
 # # 生成uboot.dtb
@@ -82,9 +74,16 @@ if [ ! -d "$SHELL_FOLDER/output/os" ]; then
 mkdir $SHELL_FOLDER/output/os
 fi
 cd $SHELL_FOLDER/os
+# 编译app加载模块
+make build_app
+./build.out
+# 编译os
 make
 cp $SHELL_FOLDER/os/os.bin $SHELL_FOLDER/output/os/os.bin
 make clean
+
+
+
 
 # 合成firmware固件
 if [ ! -d "$SHELL_FOLDER/output/fw" ]; then  
@@ -104,7 +103,9 @@ dd of=fw.bin bs=1k conv=notrunc seek=1K if=$SHELL_FOLDER/output/uboot/quard_star
 dd of=fw.bin bs=1k conv=notrunc seek=2k if=$SHELL_FOLDER/output/opensbi/fw_jump.bin
 # 写入 trusted_domain.bin,地址偏移量为 1K*4K = 0x400000，因此 trusted_domain.bin的地址偏移量为  0x400000
 dd of=fw.bin bs=1k conv=notrunc seek=4K if=$SHELL_FOLDER/output/trusted_domain/trusted_fw.bin
-# # 写入 uboot.bin,地址偏移量为 1K*8K =  0x800000
-# dd of=fw.bin bs=1k conv=notrunc seek=8K if=$SHELL_FOLDER/output/uboot/u-boot.bin
-# # 写入 os.bin,地址偏移量为 1K*8K =  0x800000
+# 写入 uboot.bin,地址偏移量为 1K*8K =  0x800000
+#dd of=fw.bin bs=1k conv=notrunc seek=8K if=$SHELL_FOLDER/output/uboot/u-boot.bin
+# 写入 os.bin,地址偏移量为 1K*8K =  0x800000
 dd of=fw.bin bs=1k conv=notrunc seek=8K if=$SHELL_FOLDER/output/os/os.bin
+
+

@@ -1,12 +1,13 @@
+# tampoline入口
+.section .text.trampoline
 .globl __alltraps
-.align 4
+.align 3
 __alltraps:
     #sscratch获取s模式下的sp，同时把u模式的sp保存到sscratch寄存器中
     csrrw sp,sscratch,sp
-    #sp在restore中指向了pt_regs结构体的末尾(此结构体已销毁)，此处也就是重新压栈
     #此时需要把栈指针移动到低地址处(栈是向低地址扩展的).34个寄存器，每个需要8字节.
-    addi sp,sp,-34*8
-    #保存通用寄存器
+    #addi sp,sp,-34*8
+    #保存通用寄存器到用户Trap上下文处
     sd x1,1*8(sp)
     # skip sp(x2), we will save it later
     sd x3, 3*8(sp)
@@ -50,26 +51,38 @@ __alltraps:
     #读取sscratch中的用户栈地址，保存到内核栈
     csrr t2,sscratch
     sd t2,2*8(sp)
-
-    #把内核栈指针传递给a0，作为参数传递给处理函数
-    mv a0,sp
-    call trap_handler
+    #载入内核地址空间的token
+    ld t0, 34*8(sp)
+    #载入traphandler入口点地址
+    ld t1, 36*8(sp)
+    #将sp修改为应用内核栈地址
+    ld sp, 35*8(sp)
+    #切换到内核地址空间
+    csrw satp, t0
+    #清空快表
+    sfence.vma
+    #跳到处理函数
+    jr t1
 
 .globl __restore
-.align 4
+.align 3
 __restore:
-    # case1: start running app by __restore
+    
     # case2: back to U after handling trap
-    # sp指向内核栈中pt_regs结构体起始位置
     # mv sp, a0
     # now sp->kernel stack(after allocated), sscratch->user stack
     # restore sstatus/sepc
+    #切换到用户空间
+    csrw satp, a1
+    sfence.vma
+    #将传入的Trap上下文位置保存在sscratch
+    csrw sscratch, a0
+    #sp指向Trap上下文位置(应用地址空间)
+    mv sp, a0
     ld t0, 32*8(sp)
     ld t1, 33*8(sp)
-    ld t2, 2*8(sp)
     csrw sstatus, t0
     csrw sepc, t1
-    csrw sscratch, t2
     # restore general-purpuse registers except sp/tp
     ld x1, 1*8(sp)
     ld x3, 3*8(sp)
@@ -102,12 +115,6 @@ __restore:
     ld x30, 30*8(sp)
     ld x31, 31*8(sp)
 
-    # release TrapContext on kernel stack
-    #将sp设为结构体的末尾，代表该结构体释放。
-    #释放并不代表内存中的内容被清空，而是可以被别的程序更改
-    addi sp, sp, 34*8
-    # now sp->kernel stack, sscratch->user stack
-    #sp指向用户栈
-    csrrw sp, sscratch, sp
-    # 返回spec中的地址，第一次swtich后__restore sret到task1，随后
+    #保存Trap上下文栈顶位置
+    ld sp, 2*8(sp)
     sret

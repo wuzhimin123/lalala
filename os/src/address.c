@@ -1,6 +1,7 @@
-#include <timeros/address.h>
+#include <timeros/os.h>
 extern char etext[];
 extern char kernelend[];
+extern char trampoline[];
 
 /*u64转化为物理地址*/
 PhysAddr phys_addr_from_size_t(uint64_t v)
@@ -195,7 +196,7 @@ void StackFrameAllocator_dealloc(StackFrameAllocator *allocator, PhysPageNum ppn
         return;
     }
     //确保ppn没有被回收
-    if(allocator->recycled.top > 0)
+    if(allocator->recycled.top >= 0)
     {
         for(size_t i = 0;i <= allocator->recycled.top;i++)
         {
@@ -350,7 +351,7 @@ PageTable kvmmake(void)
 {
     PageTable pt;
     //分配一个空闲页表作为根页表(一级页表)
-    PhysPageNum root_ppn = StackFrameAllocator_alloc(&FrameAllocatorImpl);
+    PhysPageNum root_ppn = kalloc();
     pt.root_ppn = root_ppn;
     printk("root_ppn:%p\n",phys_addr_from_phys_page_num(root_ppn));
 
@@ -363,15 +364,24 @@ PageTable kvmmake(void)
     PageTable_map(&pt,virt_addr_from_size_t((u64)etext),phys_addr_from_size_t((u64)etext), \
                     PHYSTOP - (u64)etext, PTE_R|PTE_W);
     printk("finish kernel data and physical RAM map!\n");
+    //trapoline地址映射
+    PageTable_map(&pt, virt_addr_from_size_t(TRAMPOLINE), phys_addr_from_size_t((u64)trampoline), \
+                    PAGE_SIZE, PTE_R | PTE_X );
+    printk("finish TRAMPOLINE Page map!\n");
+    /*为进程分配内核栈*/
+    proc_mapstacks(&pt);
+    printk("finish kernel stack map!\n");
     return pt;
 }
 
 /*内核根页表放在0x80250000，根据这个页表可查到映射关系*/
 /*建立内核页表*/
 PageTable kernel_pagetable;
+u64 kernel_satp;
 void kvminit()
 {
     kernel_pagetable = kvmmake();
+    kernel_satp = MAKE_SATP(kernel_pagetable.root_ppn.value);
 }
 
 /*写satp寄存器，清空快表。快表是MMU根据页表映射关系设置的，MMU会首先读快表，然后读根页表*/
@@ -379,43 +389,40 @@ void kvminithart()
 {
     // wait for any previous writes to the page table memory to finish.
     //MAKE_SATP，启动SV39模式，并将根页表号写入(得到一个将要写入satp寄存器的值)
-    printk("satp:%lx\n",MAKE_SATP(kernel_pagetable.root_ppn.value));
+    
     sfence_vma();//第一次清空TLB是satp切换内容之前有旧的映射
-    //写入到satp寄存器
-    w_satp(MAKE_SATP(kernel_pagetable.root_ppn.value));
+    //写入到satp寄存器,开启SV39分页模式(写入satp寄存器内容可选择分页模式或不分页)
+    w_satp(kernel_satp);
   
     // flush stale entries from the TLB.
     sfence_vma();//第二次清空TLB是第一次清空和satp切换内容之间可能存在页表映射查找,MMU会在快表中记录
     reg_t satp = r_satp();
 
-    printk("satp:%lx\n",satp);
-
-    
 }
-void frame_allocator_test()
-{
-    PhysPageNum frame[10];
-    StackFrameAllocator_new(&FrameAllocatorImpl);
-    StackFrameAllocator_init(&FrameAllocatorImpl, \
-            floor_phys(phys_addr_from_size_t(MEMORY_START)), \
-            ceil_phys(phys_addr_from_size_t(MEMORY_END)));
-    printk("Memoery start:%d\n",floor_phys(phys_addr_from_size_t(MEMORY_START)));
-    printk("Memoery end:%d\n",ceil_phys(phys_addr_from_size_t(MEMORY_END)));
-    for (size_t i = 0; i < 5; i++)
-    {
-         frame[i] = StackFrameAllocator_alloc(&FrameAllocatorImpl);
-         printk("frame id:%d\n",frame[i].value);
-    }
-    for (size_t i = 0; i < 5; i++)
-    {
-        StackFrameAllocator_dealloc(&FrameAllocatorImpl,frame[i]);
-        printk("allocator->recycled.data.value:%d\n",FrameAllocatorImpl.recycled.data[i]);
-        printk("frame id:%d\n",frame[i].value);
-    }
-    PhysPageNum frame_test[10];
-    for (size_t i = 0; i < 5; i++)
-    {
-         frame[i] = StackFrameAllocator_alloc(&FrameAllocatorImpl);
-        printk("frame id:%d\n",frame[i].value);
-    }
-}
+// void frame_allocator_test()
+// {
+//     PhysPageNum frame[10];
+//     StackFrameAllocator_new(&FrameAllocatorImpl);
+//     StackFrameAllocator_init(&FrameAllocatorImpl, \
+//             floor_phys(phys_addr_from_size_t(MEMORY_START)), \
+//             ceil_phys(phys_addr_from_size_t(MEMORY_END)));
+//     printk("Memoery start:%d\n",floor_phys(phys_addr_from_size_t(MEMORY_START)));
+//     printk("Memoery end:%d\n",ceil_phys(phys_addr_from_size_t(MEMORY_END)));
+//     for (size_t i = 0; i < 5; i++)
+//     {
+//          frame[i] = StackFrameAllocator_alloc(&FrameAllocatorImpl);
+//          printk("frame id:%d\n",frame[i].value);
+//     }
+//     for (size_t i = 0; i < 5; i++)
+//     {
+//         StackFrameAllocator_dealloc(&FrameAllocatorImpl,frame[i]);
+//         printk("allocator->recycled.data.value:%d\n",FrameAllocatorImpl.recycled.data[i]);
+//         printk("frame id:%d\n",frame[i].value);
+//     }
+//     PhysPageNum frame_test[10];
+//     for (size_t i = 0; i < 5; i++)
+//     {
+//          frame[i] = StackFrameAllocator_alloc(&FrameAllocatorImpl);
+//         printk("frame id:%d\n",frame[i].value);
+//     }
+// }

@@ -41,6 +41,10 @@ typedef struct TrapContext
 	/* S模式下的寄存器 */
 	reg_t sstatus;
 	reg_t sepc;
+	/*mmu相关*/
+	reg_t kernel_satp;     //内核地址空间的satp值
+	reg_t kernel_sp;       //内核栈栈顶的虚拟地址
+	reg_t trap_handler;    //内核中 trap handler 入口的虚拟地址
 }TrapContext;
 
 /*S模式任务上下文*/
