@@ -1,6 +1,6 @@
 #include <timeros/os.h>
 #define CLOCK_FREQ 10000000
-#define TICKS_PER_SEC 100
+#define TICKS_PER_SEC 10000
 /*设置下次时钟中断的cnt值*/
 /*CLOCK_FREQ为每秒时钟周期，TICKS_PER_SEC为每秒中断次数*/
 void set_next_trigger()

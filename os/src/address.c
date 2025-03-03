@@ -219,8 +219,6 @@ void frame_alloctor_init()
     StackFrameAllocator_init(&FrameAllocatorImpl, \
             ceil_phys(phys_addr_from_size_t(kernelend)), \
             ceil_phys(phys_addr_from_size_t(PHYSTOP)));
-    printk("Memoery start:%p\n",kernelend);
-    printk("Memoery end:%p\n",PHYSTOP);
 }
 
 
@@ -353,9 +351,6 @@ PageTable kvmmake(void)
     //分配一个空闲页表作为根页表(一级页表)
     PhysPageNum root_ppn = kalloc();
     pt.root_ppn = root_ppn;
-    printk("root_ppn:%p\n",phys_addr_from_phys_page_num(root_ppn));
-
-    printk("etext:%p\n",(u64)etext);
     //实现内核text段恒等映射,可读可执行,u模式不可访问。(etext在链接脚本文件中定义)
     PageTable_map(&pt,virt_addr_from_size_t(KERNBASE),phys_addr_from_size_t(KERNBASE), \
                     (u64)etext - KERNBASE, PTE_R|PTE_X);
@@ -363,14 +358,11 @@ PageTable kvmmake(void)
     //实现内核data段恒等映射，可读可写，u模式不可访问
     PageTable_map(&pt,virt_addr_from_size_t((u64)etext),phys_addr_from_size_t((u64)etext), \
                     PHYSTOP - (u64)etext, PTE_R|PTE_W);
-    printk("finish kernel data and physical RAM map!\n");
     //trapoline地址映射
     PageTable_map(&pt, virt_addr_from_size_t(TRAMPOLINE), phys_addr_from_size_t((u64)trampoline), \
                     PAGE_SIZE, PTE_R | PTE_X );
-    printk("finish TRAMPOLINE Page map!\n");
     /*为进程分配内核栈*/
     proc_mapstacks(&pt);
-    printk("finish kernel stack map!\n");
     return pt;
 }
 

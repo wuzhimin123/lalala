@@ -43,3 +43,11 @@ void sbi_set_timer(uint64_t stime_value)
 	sbi_ecall(SBI_EXT_TIME, SBI_FID_SET_TIMER, stime_value,
 		  0, 0, 0, 0, 0);
 }
+
+int sbi_console_getchar(void)
+{
+	struct sbiret ret;
+	ret = sbi_ecall(SBI_EXT_0_1_CONSOLE_GETCHAR,0,0,0,0,0,0,0);
+	//返回字符存储在error字段中
+	return ret.error;
+}

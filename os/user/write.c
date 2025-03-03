@@ -4,10 +4,11 @@
 int main()
 {
 
-    const char *message = "task12\n";
+    const char *message = "task write is running!\n";
     while (1)
     {
-       printf(message);
+        char data = getchar();
+        printf("%c",data);
     }
     return 0;
 }

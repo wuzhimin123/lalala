@@ -1,10 +1,10 @@
 #include <timeros/loader.h>
-#include <timeros/eldef.h>
 #include <timeros/address.h>
 /*load_app 函数是一段在操作系统运行时执行的代码，
 其核心目的是将一个 ELF 格式的应用程序加载到内存中并进行映射，为应用程序的运行做好准备*/
 extern u64 _num_app[];
-
+extern char _app_names[];
+static char* app_names[MAX_TASKS];
 // 获取加载的app数量
 size_t get_num_app()
 {
@@ -24,6 +24,30 @@ AppMetadata  get_app_data(size_t app_id)
     assert(app_id <= num_app);
 
     return metadata;
+}
+
+void get_app_names()
+{
+    int app_num = get_num_app();
+    printk("/**** APPS ****\n");
+    for (size_t i = 0; i < app_num; i++)
+    {
+        if(i==0)
+        {
+            size_t len = strlen(_app_names);
+            app_names[0] = _app_names;
+        }
+        else
+        {
+            size_t len = strlen(app_names[i-1]);
+            app_names[i] = (char*)((u64)_app_names + i * len + 1);
+        }
+
+        printk("%s\n",app_names[i]);
+        
+    }
+    printk("**************/");
+    
 }
 
 
@@ -59,14 +83,14 @@ void load_app(size_t app_id)
     proc->entry = entry;
     // Program Header 解析
     elf64_phdr_t *phdr;
-    //遍历每一个逻辑段
+    //将内存中 ELF 文件的可加载段（PT_LOAD 类型的段）复制到新分配的物理内存中，并建立虚拟地址到物理地址的映射关系
     for (size_t i = 0; i < ehdr->e_phnum; i++)
     {
         //拿到每个Program Header的指针
         phdr =(u64) (ehdr->e_phoff + ehdr->e_phentsize * i + metadata.start);
         if(phdr->p_type == PT_LOAD)
         {
-            // 获取映射内存段开始位置
+            // 获取映射内存段开始位置(虚拟地址)
             u64 start_va = phdr->p_vaddr;
             // 获取映射内存段结束位置
             proc->ustack = start_va + phdr->p_memsz;
@@ -80,10 +104,12 @@ void load_app(size_t app_id)
                 PhysPageNum ppn = kalloc();
                     //获取到分配的物理内存的地址
                 u64 paddr = phys_addr_from_phys_page_num(ppn).value;
+                //将内核中被嵌入data段中的应用程序数据复制到分配的物理内存中
                 memcpy(paddr, metadata.start + phdr->p_offset + j, PAGE_SIZE);
                     //内存逻辑段内存映射
                 PageTable_map(&proc->pagetable,virt_addr_from_size_t(start_va + j), \
                                 phys_addr_from_size_t(paddr), PAGE_SIZE , map_perm);
+                
             }
         
             

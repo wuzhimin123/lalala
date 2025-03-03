@@ -21,6 +21,7 @@ void trap_handler()
 	set_kernel_trap_entry();
 	//获得当前应用的上下文地址
 	TrapContext* cx = get_current_trap_cx();
+	printk("cx地址:%p\n",(void*)cx);
     reg_t scause = r_scause();
 	reg_t cause_code = scause & 0xfff;//提取低12位，记录Trap具体原因
 	if(scause & 0x8000000000000000)//1<<63 = x8000000000000000,判断中断还是异常
@@ -33,7 +34,7 @@ void trap_handler()
 			schedule();//中断发生则切换任务
 			break;
 		default:
-			printf("undfined scause:%d\n",scause);
+			printk("undfined scause:%d\n",scause);
 			break;
     	}
 	}
@@ -49,7 +50,7 @@ void trap_handler()
 			/*为什么上面中断不需要，因为中断时自动把sepc设为下一条指令的地址，所以不需要手动设置了*/
 			break;
 		default:
-			printf("undfined scause:%d\n",scause);
+			printk("undfined scause:%d\n",scause);
 			break;
     	}
 	}

@@ -23,7 +23,7 @@
 //跳板页开始位置
 #define TRAMPOLINE (MAXVA - PAGE_SIZE)
 
-//计算应用内核栈的地址，每个应用的内核栈下都有一个无效的守卫页
+//计算具体应用内核栈的地址，每个应用的内核栈下都有一个无效的守卫页，p越大，地址越小，也就是栈向低地址分配
 #define KSTACK(p) (TRAMPOLINE - ((p)+1)* 2*PAGE_SIZE)
 
 //Sv39 分页机制
