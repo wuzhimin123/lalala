@@ -38,6 +38,16 @@ struct TaskContext tcx_init(reg_t kstack_ptr)
     return task_ctx;
 }
 
+/*将所有进程状态初始化为UnInit*/
+void procinit()
+{
+    struct TaskControlBlock *p;
+    for(p = tasks;p < &tasks[MAX_TASKS];p++)
+    {
+        p->task_state = UnInit;
+    }
+}
+
 /* 为每个应用程序映射内核栈*/
 void proc_mapstacks(PageTable* kpgtbl)
 {
@@ -197,6 +207,12 @@ void schedule()
     }
 }
 
+/*返回当前进程PCB指针*/
+struct TaskControlBlock *current_proc()
+{
+    return &tasks[_current];
+}
+
 /*分配pid号*/
 int allocpid()
 {
@@ -206,4 +222,52 @@ int allocpid()
     return pid;
 }
 
+/*为进程映射Trap页和跳板页*/
+struct TaskControlBlock* allocproc()
+{
+    struct TaskControlBlock *p;
+    for(p = tasks;p < &tasks[MAX_TASKS];p++)
+    {
+        if(p->task_state == UnInit)
+            goto found;
+    }
+    return 0;
+found:
+       p->pid = allocpid();
+       p->task_state = Ready;
+       //为每个应用分配一页内存来存放trap上下文
+       proc_trap(p);
+       //为每个用户程序创建页表，映射跳板页和trap上下文页
+       proc_pagetable(p);
+    return p;
+}
+
+/*分配子进程*/
+int __sys_fork()
+{
+    struct TaskControlBlock *np;
+    struct TaskControlBlock *p = current_proc();
+
+    if((np = allocproc()) == 0)
+        return -1;
+    //拷贝父进程内存数据
+    uvmcopy(&p->pagetable,&np->pagetable,p->base_size);
+    
+    memcpy((void*)np->trap_cx_ppn,(void*)p->trap_cx_ppn,PAGE_SIZE);
+    TrapContext *cx_ptr = np->trap_cx_ppn;
+    //子进程返回0，修改应用内核栈的a0，后面restore恢复到a0寄存器中返回0
+    cx_ptr->a0 = 0;
+    //复制TCB的信息
+    np->entry = p->entry;
+    np->base_size = p->base_size;
+    np->parent = p;
+    np->ustack = p->ustack;
+    //设置子进程返回地址和内核栈
+    np->task_context.ra = trap_return;
+    np->task_context.sp = np->kstack;
+
+    _top++;
+    return np->pid;
+
+}
 

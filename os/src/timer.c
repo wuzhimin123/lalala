@@ -1,6 +1,6 @@
 #include <timeros/os.h>
 #define CLOCK_FREQ 10000000
-#define TICKS_PER_SEC 10000
+#define TICKS_PER_SEC 100
 /*设置下次时钟中断的cnt值*/
 /*CLOCK_FREQ为每秒时钟周期，TICKS_PER_SEC为每秒中断次数*/
 void set_next_trigger()
@@ -11,13 +11,14 @@ void set_next_trigger()
 /*开启S模式下的时钟中断，目的是s态的时钟中断来让u态的应用程序Trap*/
 void timer_init()
 {
-    reg_t sstatus = r_sstatus();
-    sstatus |= (1L << 1);//sstatus的sie置1，设置S态的中断,此处就算不设为1，u态依旧会被s态中断，s态优先级更高
-    w_sstatus(sstatus);
-    reg_t sie = r_sie();
-    sie |= SIE_STIE;//SIE的stie置1，设置时钟中断
-    w_sie(sie);
-    set_next_trigger();
+   //开启S模式下的中断
+   intr_on();
+   //开启时钟中断
+   reg_t sie = r_sie();
+   sie |= SIE_STIE;
+   w_sie(sie);
+   //
+   set_next_trigger();
 }
 
 /* 以us为单位返回时间 */

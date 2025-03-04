@@ -1,14 +1,20 @@
 #include <timeros/os.h>
 #include <timeros/syscall.h>
-#include <timeros/stdio.h>
+#include <timeros/string.h>
 
 int main(int argc, char const *argv[])
 {
-    uint64_t current_timer = 0;
+    int pid = sys_fork();
     while (1)
     {
-       current_timer = sys_gettime();
-    //    printf("current_timer:%x\n",current_timer);
+        // //父进程
+        // if(pid > 0)
+        //     printf("father\n");
+        // else if(pid == 0)
+        //     printf("child\n");
+        // else
+        //     printf("failed!\n");
+        printf("pid:%d\n",pid);
 
     }
     return 0;

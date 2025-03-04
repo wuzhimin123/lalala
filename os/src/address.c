@@ -334,6 +334,33 @@ void PageTable_map(PageTable* pt,VirtAddr va,PhysAddr pa,u64 size,uint8_t pteflg
     
 }
 
+/*将一个旧的根页表的内容拷贝到一个新的根页表上，页表上找到的物理页的内容也全部拷贝并实现相同的映射*/
+int uvmcopy(PageTable *old, PageTable *new, u64 sz)
+{
+    PageTableEntry *pte;
+    u64 pa,i;
+    u8 flags;
+    for(i = 0; i < sz; i+=PAGE_SIZE)
+    {
+        VirtPageNum vpn = floor_virts(virt_addr_from_size_t(i));
+        pte = find_pte(old,vpn);
+        if(pte != 0)
+        {
+            //pte转化为物理地址，也就是父进程已分配的物理页的起始地址
+            u64 phyaddr = PTE2PA(pte->bits);
+            flags = PTE_FLAGS(pte->bits);
+            //分配一页内存
+            PhysPageNum ppn = kalloc();
+            //ppn转化为物理内存，也就是子进程新分配的物理页页的起始地址
+            u64 paddr = phys_addr_from_phys_page_num(ppn).value;
+            //将旧页的内容拷贝到新页
+            memcpy((void*)paddr,(void*)phyaddr,PAGE_SIZE);
+            //映射新物理页到new页表
+            PageTable_map(new,virt_addr_from_size_t(i), \
+                            phys_addr_from_size_t(paddr),PAGE_SIZE,flags);
+        }
+    }
+}
 //取消映射
 void PageTable_unmap(PageTable* pt,VirtPageNum vpn)
 {

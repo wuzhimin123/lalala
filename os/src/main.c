@@ -10,7 +10,9 @@ void os_main()
    
    //初始化内存
    kvminit();
-
+   //初始化进程
+   procinit();
+   //加载进程(app)
    load_app(0);
    app_init(0);
    load_app(1);
@@ -21,7 +23,7 @@ void os_main()
    //trap初始化
    set_kernel_trap_entry();
 
-   
+   get_app_names();
 
    timer_init();
 

@@ -21,7 +21,6 @@ void trap_handler()
 	set_kernel_trap_entry();
 	//获得当前应用的上下文地址
 	TrapContext* cx = get_current_trap_cx();
-	printk("cx地址:%p\n",(void*)cx);
     reg_t scause = r_scause();
 	reg_t cause_code = scause & 0xfff;//提取低12位，记录Trap具体原因
 	if(scause & 0x8000000000000000)//1<<63 = x8000000000000000,判断中断还是异常
@@ -44,16 +43,19 @@ void trap_handler()
 		{
 		/*用户态的系统调用*/
 		case 8:
-			cx->a0 = __SYSCALL(cx->a7,cx->a0,cx->a1,cx->a2);
+
 			cx->sepc += 8;//系统调用完毕要从下一条指令开始运行，若不+8此时sepc设为ecall的地址。
 			// trap_handler结束运行__restore将sepc恢复到pc
 			/*为什么上面中断不需要，因为中断时自动把sepc设为下一条指令的地址，所以不需要手动设置了*/
+			//这里如果是父进程，会得到子进程pid；如果是子进程那么子进程不会执行到这里，a0在fork中被设为0
+			cx->a0 = __SYSCALL(cx->a7,cx->a0,cx->a1,cx->a2);
 			break;
 		default:
 			printk("undfined scause:%d\n",scause);
 			break;
     	}
 	}
+	//子进程从此处执行
 	//__restore之前设置好Trap上下文保存地址等
     trap_return();
 }

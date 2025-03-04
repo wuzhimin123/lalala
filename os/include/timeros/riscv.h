@@ -53,10 +53,16 @@ static inline reg_t r_stvec()
     return x;
 }
 
-#define SIE_SEIE (1L << 9)
-#define SIE_STIE (1L << 5)
-#define SIE_SSIE (1L << 1)
 
+#define SSTATUS_SPP (1L << 8)  // Previous mode, 1=Supervisor, 0=User
+#define SSTATUS_SPIE (1L << 5) // Supervisor Previous Interrupt Enable
+#define SSTATUS_UPIE (1L << 4) // User Previous Interrupt Enable
+#define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
+#define SSTATUS_UIE (1L << 0)  // User Interrupt Enable
+// Supervisor Interrupt Enable
+#define SIE_SEIE (1L << 9) // external
+#define SIE_STIE (1L << 5) // timer
+#define SIE_SSIE (1L << 1) // software
 /*volatile告诉编译器不要对这段代码优化,"=r"表示将结果存储到通用寄存器，
 (x)表示将通用寄存器的值赋给变量x*/
 static inline reg_t r_sie()
@@ -98,4 +104,23 @@ static inline void sfence_vma()
   asm volatile("sfence.vma zero, zero");
 }
 
+// 关闭中断
+static inline void intr_off()
+{
+  w_sstatus(r_sstatus() & ~SSTATUS_SIE);
+}
+
+// 打开中断
+static inline void intr_on()
+{
+  w_sstatus(r_sstatus() | SSTATUS_SIE);
+}
+
+// are device interrupts enabled?
+static inline int
+intr_get()
+{
+  reg_t x = r_sstatus();
+  return (x & SSTATUS_SIE) != 0;
+}
 #endif

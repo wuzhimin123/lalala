@@ -16,6 +16,11 @@ uint64_t syscall(size_t id, reg_t arg1, reg_t arg2, reg_t arg3) {
 }
 
 
+int sys_fork()
+{
+    return syscall(__NR_clone,0,0,0);
+}
+
 uint64_t sys_write(size_t fd, const char *buf, size_t len)
 {
     syscall(__NR_write, fd, buf, len);

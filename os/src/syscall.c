@@ -81,6 +81,8 @@ uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {
             break;
         case __NR_gettimeofday:
             return __sys_gettime();
+        case __NR_clone:
+            return __sys_fork();
         default:
             printk("Unsupported syscall id:%d\n",syscall_id);
             break;

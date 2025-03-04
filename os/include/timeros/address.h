@@ -36,6 +36,9 @@
 
 #define PGROUNDUP(sz)  (((sz)+PAGE_SIZE-1) & ~(PAGE_SIZE-1))
 #define PGROUNDDOWN(a) (((a)) & ~(PAGE_SIZE-1))
+
+#define PTE2PA(pte) (((pte) >> 10) << 12)
+#define PTE_FLAGS(pte) ((pte) & 0x3FF)
 /* 物理地址 */
 typedef struct {
     uint64_t value; 
