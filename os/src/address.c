@@ -361,6 +361,79 @@ int uvmcopy(PageTable *old, PageTable *new, u64 sz)
         }
     }
 }
+//取消多页映射(释放物理页)，从vpn开始，取消npages个页的映射
+void uvmunmap(PageTable* pt,VirtPageNum vpn,u64 npages,int do_free)
+{
+    PageTableEntry *pte;
+    u64 a;
+    for(a = vpn.value;a < vpn.value + npages; a++)
+    {
+        //找页表项，看看此页有没有被映射
+        pte = find_pte(pt,virt_page_num_from_size_t(a));
+        if(pte!=0)
+        {
+            if(do_free)
+            {
+                //获得pte对应的物理页的物理地址（起始地址）
+                u64 phyaddr = PTE2PA(pte->bits);
+                //得到物理页号
+                PhysPageNum ppn = floor_phys(phys_addr_from_size_t(phyaddr));
+                //释放物理内存
+                kfree(ppn);
+            }
+            //设为空
+            *pte = PageTableEntry_empty();
+        }
+    }
+}
+
+/* 解除页表映射关系，释放内存*/
+void freewalk(PhysPageNum ppn)
+{
+    for (int i = 0; i < 512; i++)
+    {
+        PageTableEntry* pte =  &get_pte_array(ppn)[i];
+        //printk("i:%d ",i);
+        //一是有效位为 1，即该页表项有效；二是不包含任何读写执行权限标志，即它是一个中间级页表项
+        if((pte->bits & PTE_V) && (pte->bits & (PTE_R|PTE_W|PTE_X)) == 0)
+        {
+            //取出下一级页表的页号
+            //printk("pte->bits:%x\n",pte->bits);
+            PhysPageNum child_ppn = PageTableEntry_ppn(pte);
+            //printk("child ppn:%d\n",child_ppn.value);
+            freewalk(child_ppn);
+            *pte = PageTableEntry_empty();
+        }
+        else if(pte->bits & PTE_V)
+        {
+            panic("freewalk: leaf");
+        }
+    }
+    printk("free ppn:%d\n",ppn.value);
+    printk("\n");
+    kfree(ppn); 
+}
+
+/*取消映射，释放页表占用的物理空间*/
+void uvmfree(PageTable *pt, u64 sz)
+{
+    if(sz > 0)
+        uvmunmap(pt,floor_virts(virt_addr_from_size_t(0)),sz/PAGE_SIZE,1);
+    //释放页表物理空间
+    freewalk(pt->root_ppn);
+}
+
+/*销毁应用程序的地址空间*/
+void proc_freepagetable(PageTable *pagetable, u64 sz)
+{
+    //解除TRAMPOLINE页映射关系，不释放内存
+    uvmunmap(pagetable,floor_virts(virt_addr_from_size_t(TRAMPOLINE)),1,0);
+    //解除TRAPFRAME页映射关系，不释放内存
+    uvmunmap(pagetable,floor_virts(virt_addr_from_size_t(TRAPFRAME)),1,0);
+    //解除0x10000到baze_size之间的内存页的映射关系，并且释放物理内存
+    uvmfree(pagetable, sz);
+}
+
 //取消映射
 void PageTable_unmap(PageTable* pt,VirtPageNum vpn)
 {
@@ -371,7 +444,7 @@ void PageTable_unmap(PageTable* pt,VirtPageNum vpn)
     *pte = PageTableEntry_empty();
 }
 
-/*内核代码段数据段恒等映射，得到映射的根页表*/
+/*内核恒等映射，得到映射的根页表*/
 PageTable kvmmake(void)
 {
     PageTable pt;
@@ -382,7 +455,7 @@ PageTable kvmmake(void)
     PageTable_map(&pt,virt_addr_from_size_t(KERNBASE),phys_addr_from_size_t(KERNBASE), \
                     (u64)etext - KERNBASE, PTE_R|PTE_X);
     printk("finish kernel text map!\n");
-    //实现内核data段恒等映射，可读可写，u模式不可访问
+    //实现内核data段和空闲内存恒等映射，可读可写，u模式不可访问
     PageTable_map(&pt,virt_addr_from_size_t((u64)etext),phys_addr_from_size_t((u64)etext), \
                     PHYSTOP - (u64)etext, PTE_R|PTE_W);
     //trapoline地址映射

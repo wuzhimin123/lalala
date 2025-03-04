@@ -48,7 +48,10 @@ void trap_handler()
 			// trap_handler结束运行__restore将sepc恢复到pc
 			/*为什么上面中断不需要，因为中断时自动把sepc设为下一条指令的地址，所以不需要手动设置了*/
 			//这里如果是父进程，会得到子进程pid；如果是子进程那么子进程不会执行到这里，a0在fork中被设为0
-			cx->a0 = __SYSCALL(cx->a7,cx->a0,cx->a1,cx->a2);
+			u64 result = __SYSCALL(cx->a7,cx->a0,cx->a1,cx->a2);
+			//如果发生了exec，获取新分配的trap上下文地址
+			cx = get_current_trap_cx();
+			cx->a0 = result;
 			break;
 		default:
 			printk("undfined scause:%d\n",scause);

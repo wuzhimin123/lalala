@@ -21,6 +21,11 @@ int sys_fork()
     return syscall(__NR_clone,0,0,0);
 }
 
+int sys_exec(char *name)
+{
+    return syscall(__NR_execve,0,name,0);
+}
+
 uint64_t sys_write(size_t fd, const char *buf, size_t len)
 {
     syscall(__NR_write, fd, buf, len);

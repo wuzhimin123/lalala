@@ -2,7 +2,7 @@
 #include <timeros/stdio.h>
 #include <timeros/address.h>
 //转换为物理地址(应用层和内核层看到的地址不同，需要转化)
-char *translated_byte_buffer(const char* data , size_t len)
+char *translated_byte_buffer(const char* data)
 {   
     u64 user_satp = current_user_token();  
     PageTable  pt ;
@@ -10,14 +10,15 @@ char *translated_byte_buffer(const char* data , size_t len)
     pt.root_ppn.value = MAKE_PAGETABLE(user_satp);
     //指针data转换为虚拟地址
     u64 start_va = data;
-    u64 end_va = start_va + len;
+    // u64 end_va = start_va + len;
     //最终找到页表项
     VirtPageNum vpn = floor_virts(virt_addr_from_size_t(start_va));
     PageTableEntry* pte = find_pte(&pt , vpn);
     
     //拿到物理页地址
-    int mask = ~( (1 << 10) -1 );
-    u64 phyaddr = ( pte->bits & mask) << 2 ;
+    // int mask = ~( (1 << 10) -1 );
+    // u64 phyaddr = ( pte->bits & mask) << 2 ;
+    u64 phyaddr = PTE2PA(pte->bits);
     //拿到偏移地址
     u64 page_offset = start_va & 0xFFF;
     //得到物理地址
@@ -31,7 +32,7 @@ void __sys_write(size_t fd, const char* data, size_t len)
     if(fd == stdout || fd == stderr)
     {
         //printk(" ");
-        char* str = translated_byte_buffer(data,len);
+        char* str = translated_byte_buffer(data);
         printk("%s",str);
     }
     else
@@ -51,8 +52,11 @@ void __sys_read(size_t fd,const char* data,size_t len)
             c = sbi_console_getchar();
             if(c!= -1)
                 break;
+            //读不到数据就切换进程，这样就不会阻塞在这里
+            schedule();
+            continue;
         }
-        char *str = translated_byte_buffer(data,len);
+        char *str = translated_byte_buffer(data);
         str[0] = c;
     }
 }
@@ -65,6 +69,14 @@ void __sys_yield()
 uint64_t __sys_gettime()
 {
     return get_time_us();
+}
+
+uint64_t __sys_exec(const char *name)
+{
+    char *app_name = translated_byte_buffer(name);
+    printk("exec app_name:%s\n",app_name);
+    exec(app_name);
+    return 0;
 }
 
 uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {
@@ -83,6 +95,8 @@ uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {
             return __sys_gettime();
         case __NR_clone:
             return __sys_fork();
+        case __NR_execve:
+            return __sys_exec(arg2);
         default:
             printk("Unsupported syscall id:%d\n",syscall_id);
             break;
