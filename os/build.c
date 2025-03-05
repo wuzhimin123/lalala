@@ -87,3 +87,4 @@ int main() {
     insert_app_data();
     return 0;
 }
+

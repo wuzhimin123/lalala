@@ -29,7 +29,7 @@ __switch:
         LOAD_SN %n
         .set n, n + 1
     .endr
-    # restore kernel stack of next task
+    # restore kernel stack of next task,恢复下一个任务trap上下文页地址
     ld sp, 8(a1)
-    # 返回到ra寄存器的存储的地址，第一次调用返回到__restore
+    # 返回到ra寄存器的存储的地址，第一次调用返回到trap_return
     ret

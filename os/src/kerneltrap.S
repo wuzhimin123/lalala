@@ -3,7 +3,7 @@
 .globl __alltraps
 .align 3
 __alltraps:
-    #sscratch获取s模式下的sp，同时把u模式的sp保存到sscratch寄存器中
+    #sscratch获取Trap上下文的sp，同时把u模式的sp保存到sscratch寄存器中
     csrrw sp,sscratch,sp
     #此时需要把栈指针移动到低地址处(栈是向低地址扩展的).34个寄存器，每个需要8字节.
     #addi sp,sp,-34*8
@@ -116,6 +116,6 @@ __restore:
     ld x30, 30*8(sp)
     ld x31, 31*8(sp)
 
-    #保存Trap上下文栈顶位置
+    #指向用户栈栈顶位置，因为用户栈用来存储函数调用返回时返回值等等信息
     ld sp, 2*8(sp)
     sret
