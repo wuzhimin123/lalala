@@ -1,9 +1,8 @@
 #include <timeros/types.h>
 #include <timeros/syscall.h>
 #include <timeros/string.h>
+/*初始进程*/
 int main()
 {
-
-    sys_exec("xec");
-    return 0;
+    sys_exec("user_shell");
 }

@@ -59,7 +59,7 @@ void proc_mapstacks(PageTable* kpgtbl)
       panic("kalloc");
     /*分配时会分配两页，一页是内核栈，一页是保护，具体那一页是内核栈，由本函数最后的赋值决定*/
     u64 va = KSTACK((int) (p - tasks));
-    PageTable_map(kpgtbl, virt_addr_from_size_t(va ), phys_addr_from_size_t((u64)pa), \
+    PageTable_map(kpgtbl, virt_addr_from_size_t(va), phys_addr_from_size_t((u64)pa), \
                   PAGE_SIZE, PTE_R | PTE_W);
     // 给某个具体应用的内核栈赋值,指向栈顶，这里指明了分配的两页中哪个是栈顶
     p->kstack = va + PAGE_SIZE;
@@ -75,7 +75,7 @@ void proc_trap(struct TaskControlBlock *p)
     memset(&p->task_context,0,sizeof(p->task_context));
 }
 
-/*为应用程序创建根页表，映射trapoline和trap上下文存放地址*/
+/*为应用程序创建新的根页表，映射trapoline和trap上下文存放地址*/
 void proc_pagetable(struct TaskControlBlock *p)
 {
     PageTable pagetable;
@@ -196,13 +196,13 @@ void schedule()
     /*轮转调度*/
     int next = _current + 1;
     next = next % _top;
+    tasks[_current].task_state = Ready;
     /*Ready才可以切换*/
     if(tasks[next].task_state == Ready)
     {
         struct TaskContext *current_task_cx_ptr = &(tasks[_current].task_context);
         struct TaskContext *next_task_cx_ptr = &(tasks[next].task_context);
         tasks[next].task_state = Running;
-        tasks[_current].task_state = Ready;
         _current = next;
         __switch(current_task_cx_ptr,next_task_cx_ptr);
     }
@@ -267,15 +267,14 @@ int __sys_fork()
     np->parent = p;
     np->ustack = p->ustack;
     //设置子进程返回地址和内核栈
-    np->task_context.ra = trap_return;
-    np->task_context.sp = np->kstack;
+    np->task_context = tcx_init((reg_t)np->kstack);
 
     _top++;
     return np->pid;
 
 }
 /*当前进程下，释放旧app页表，为新app创建新页表并映射*/
-void exec(const char* name)
+int exec(const char* name)
 {
     AppMetadata metadata = get_app_data_by_name(name);
     //ELF 文件头
@@ -298,17 +297,20 @@ void exec(const char* name)
     TrapContext* cx_ptr = proc->trap_cx_ppn;
     cx_ptr->sepc = (u64)ehdr->e_entry;
     cx_ptr->sp = proc->ustack;
-    reg_t sstatus = r_sstatus();
-    //设置第8位spp位位0，表示为U模式
-    sstatus &= (0U << 8);
-    w_sstatus(sstatus);
-    cx_ptr->sstatus = sstatus;
-    //内核页表token
-    cx_ptr->kernel_satp = kernel_satp;
-    //内核栈虚拟地址
-    cx_ptr->kernel_sp = proc->kstack;
-    //trap_handler地址
-    cx_ptr->trap_handler = (u64)trap_handler;
+    /*下面这些还是用的当前进程的Trap上下文，只是重新映射，以下内容不需要改变，*/
+    // reg_t sstatus = r_sstatus();
+    // //设置第8位spp位位0，表示为U模式
+    // sstatus &= (0U << 8);
+    // w_sstatus(sstatus);
+    // cx_ptr->sstatus = sstatus;
+    // //内核页表token
+    // cx_ptr->kernel_satp = kernel_satp;
+    // //内核栈虚拟地址
+    // cx_ptr->kernel_sp = proc->kstack;
+    // //trap_handler地址
+    // cx_ptr->trap_handler = (u64)trap_handler;
     //释放旧应用程序旧页表
     proc_freepagetable(&old_pagetable,oldsz);
+    printk("sys_exec\n");
+    return 0;
 }
