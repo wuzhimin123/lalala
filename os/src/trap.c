@@ -47,9 +47,11 @@ void trap_handler()
 			cx->sepc += 8;//系统调用完毕要从下一条指令开始运行，若不+8此时sepc设为ecall的地址。
 			// trap_handler结束运行__restore将sepc恢复到pc
 			/*为什么上面中断不需要，因为中断时自动把sepc设为下一条指令的地址，所以不需要手动设置了*/
-			//这里如果是父进程，会得到子进程pid；如果是子进程那么子进程不会执行到这里，a0在fork中被设为0
+			//这里如果是父进程，会得到子进程pid；
 			u64 result = __SYSCALL(cx->a7,cx->a0,cx->a1,cx->a2);
+			//子进程创建完毕后，处于内核态，父进程swich后到ra寄存器也就是trap_return,然后子进程恢复用户态
 			//如果发生了exec，获取新分配的trap上下文地址
+			
 			cx = get_current_trap_cx();
 			cx->a0 = result;
 			break;

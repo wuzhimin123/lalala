@@ -38,7 +38,9 @@ LIB:=./lib
 OBJS = $(SRCS_ASM:.S=.o)
 OBJS += $(SRCS_C:.c=.o)
 
-
+all: build_app os.elf
+#-T os.ld 指定链接脚本,-Wl,-Map=os.map 表示将链接过程中的符号映射信息输出到 os.map 文件中
+#$^ 代表所有的依赖项，即所有的目标文件
 os.elf: ${OBJS}
 	${CC} ${CFLAGS} -T os.ld -Wl,-Map=os.map -o os.elf $^
 	${OBJCOPY} -O binary os.elf os.bin
@@ -52,8 +54,14 @@ os.elf: ${OBJS}
 %.o : $(SRC)/%.S
 	${CC} ${CFLAGS} $(INCLUDE) -c -o $@ $<
 
+#使用make命令进入到user目录下执行
+#将build.c编译成build.out
+#执行build.out
 build_app: build.c
-	gcc $< -o build.out
+	@$(MAKE) -C ./user
+	@gcc $< -o build.out
+	./build.out
+
 .PHONY : debug
 debug: 
 	@echo "os debug start..."
@@ -61,5 +69,6 @@ debug:
 
 .PHONY : clean
 clean:
-	rm -rf *.o *.bin 
+	rm -rf *.o *.bin *.out *.map *.elf
+	rm -rf ./user/bin/*
 

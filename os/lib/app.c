@@ -26,6 +26,11 @@ int sys_exec(char *name)
     return syscall(__NR_execve,0,name,0);
 }
 
+int sys_exit(u64 exit_code)
+{
+    return syscall(__NR_exit,exit_code,0,0);
+}
+
 uint64_t sys_write(size_t fd, const char *buf, size_t len)
 {
     syscall(__NR_write, fd, buf, len);
@@ -41,6 +46,10 @@ uint64_t sys_yield()
     syscall(__NR_sched_yield,0,0,0);
 }
 
+int sys_waitpid()
+{
+    return syscall(__NR_waitid,0,0,0);
+}
 // void task_delay(volatile int count)
 // {
 //     count *=50000;

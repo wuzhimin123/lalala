@@ -351,7 +351,7 @@ int uvmcopy(PageTable *old, PageTable *new, u64 sz)
             flags = PTE_FLAGS(pte->bits);
             //分配一页内存
             PhysPageNum ppn = kalloc();
-            //ppn转化为物理内存，也就是子进程新分配的物理页页的起始地址
+            //ppn转化为物理内存，也就是子进程新分配的物理页的起始地址
             u64 paddr = phys_addr_from_phys_page_num(ppn).value;
             //将旧页的内容拷贝到新页
             memcpy((void*)paddr,(void*)phyaddr,PAGE_SIZE);

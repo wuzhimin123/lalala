@@ -94,7 +94,8 @@ void elf_check(elf64_ehdr_t *ehdr)
 void load_segment(elf64_ehdr_t *ehdr,struct TaskControlBlock* proc)
 {
     elf64_phdr_t *phdr;
-    //将内存中 ELF 文件的可加载段（PT_LOAD 类型的段）复制到新分配的物理内存中，并建立虚拟地址到物理地址的映射关系
+    //将内存中 ELF 文件的可加载段（PT_LOAD 类型的段）
+    // 复制到新分配的物理内存中，并建立虚拟地址到物理地址的映射关系
     for (size_t i = 0; i < ehdr->e_phnum; i++)
     {
         //拿到每个Program Header的指针
@@ -120,14 +121,10 @@ void load_segment(elf64_ehdr_t *ehdr,struct TaskControlBlock* proc)
                     //内存逻辑段内存映射
                 PageTable_map(&proc->pagetable,virt_addr_from_size_t(start_va + j), \
                                 phys_addr_from_size_t(paddr), PAGE_SIZE , map_perm);
-                
-            }
-        
-            
+            }  
         }
     }
-
-    // 映射应用程序用户栈开始地址
+    // 应用程序用户栈开始地址
     proc->ustack =  2 * PAGE_SIZE + PGROUNDUP(proc->ustack);
     proc->base_size=proc->ustack;
 }

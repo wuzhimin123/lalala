@@ -25,10 +25,19 @@ int main()
                 line[strlen(line)] = '\0';
                 int pid = sys_fork();
                 printf("pid:%d\n",pid);
-                if(pid==0)
+                if(pid == 0)
                 {
                     sys_exec(line);
                 }
+                else if(pid > 0)
+                {
+                    /*父进程回收子进程*/
+                    int status = sys_waitpid(pid);
+                    printf("child proc exit:%d\n",status);
+                }
+                /*清空line数组*/
+                line[0] = '\0';
+                printf(">>");
             }
             break;
         case BS:

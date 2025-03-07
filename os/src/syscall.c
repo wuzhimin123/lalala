@@ -78,6 +78,15 @@ int __sys_exec(const char *name)
     return exec(app_name);
 }
 
+void __sys_exit(u64 exit_code)
+{
+    exit_current_and_run_next(exit_code);
+}
+
+int __sys_wait()
+{
+    return wait();
+}
 uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {
         switch (syscall_id)
         {
@@ -90,12 +99,17 @@ uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {
         case __NR_sched_yield:
             __sys_yield();
             break;
+        case __NR_exit:
+            __sys_exit(arg1);
+            break;
         case __NR_gettimeofday:
             return __sys_gettime();
         case __NR_clone:
             return __sys_fork();
         case __NR_execve:
             return __sys_exec(arg2);
+        case __NR_waitid:
+            return __sys_wait();
         default:
             printk("Unsupported syscall id:%d\n",syscall_id);
             break;

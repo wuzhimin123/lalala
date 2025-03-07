@@ -12,11 +12,9 @@ void os_main()
    kvminit();
    //初始化进程
    procinit();
-   //加载进程(app)
+   //加载进程(initproc)
    load_app(0);
    app_init(0);
-   load_app(1);
-   app_init(1);
    
    //开启sv39模式
    kvminithart();

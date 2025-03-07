@@ -7,9 +7,14 @@ OBJDUMP = ${CROSS_COMPILE}objdump
 INCLUDE:=-I../include
 
 LIB = ../lib
+BIN_DIR = bin
+#执行make会实现all后面的目标，这些目标是执行的命令
+all: $(BIN_DIR) initproc xec user_shell time
 
-all: time xec user_shell
-
+#创建bin目录的规则
+$(BIN_DIR):
+	mkdir -p $@
+#write依赖于write.c和所有lib中的.c文件
 write: write.c $(LIB)/*.c
 	${CC} ${CFLAGS} $(INCLUDE) -T user.ld $^ -o bin/write 
 
@@ -21,6 +26,9 @@ user_shell:user_shell.c $(LIB)/*.c
 
 xec: xec.c $(LIB)/*.c
 	${CC} ${CFLAGS} $(INCLUDE) -T user.ld  $^ -o bin/xec 
+
+initproc: initproc.c $(LIB)/*.c
+	${CC} ${CFLAGS} $(INCLUDE) -T user.ld $^ -o bin/initproc
 
 debug: objdump_time objdump_write objdump_xec
 

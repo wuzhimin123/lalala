@@ -11,6 +11,8 @@ uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3);
 #define __NR_gettimeofday 169
 #define __NR_clone 220
 #define __NR_execve 221
+#define __NR_exit 93
+#define __NR_waitid 95
 
 
 
@@ -22,3 +24,4 @@ int sys_fork();
 int sys_read(size_t fd ,const char* buf , size_t len);
 char getchar();
 int sys_exec(char* name);
+int sys_waitpid();
