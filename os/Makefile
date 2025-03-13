@@ -69,6 +69,6 @@ debug:
 
 .PHONY : clean
 clean:
-	rm -rf *.o *.bin *.out *.map *.elf
+	rm -rf *.o *.bin *.out *.map 
 	rm -rf ./user/bin/*
 
