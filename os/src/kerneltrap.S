@@ -48,7 +48,7 @@ __alltraps:
     sd t0,32*8(sp)
     sd t1,33*8(sp)
 
-    #读取sscratch中的用户栈地址，保存到内核栈
+    #读取sscratch中的用户栈地址，保存到trap上下文
     csrr t2,sscratch
     sd t2,2*8(sp)
     #载入内核地址空间的token

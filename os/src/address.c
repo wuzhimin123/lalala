@@ -461,7 +461,7 @@ PageTable kvmmake(void)
     //trapoline地址映射
     PageTable_map(&pt, virt_addr_from_size_t(TRAMPOLINE), phys_addr_from_size_t((u64)trampoline), \
                     PAGE_SIZE, PTE_R | PTE_X );
-    /*为进程分配内核栈*/
+    /*为每个进程分配内核栈*/
     proc_mapstacks(&pt);
     return pt;
 }

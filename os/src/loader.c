@@ -146,7 +146,7 @@ void load_app(size_t app_id)
     elf64_ehdr_t *ehdr = metadata.start;
     //检查elf文件
     elf_check(ehdr);
-    //创建任务
+    //创建任务映射跳板页和trap上下文存放地址
     TaskControlBlock* proc = task_create_pt(app_id);
     //加载程序段
     load_segment(ehdr,proc);

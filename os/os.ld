@@ -11,7 +11,7 @@ SECTIONS
 	.text : {
         *(.text.entry)
         . = ALIGN(4K);
-        trampoline = .;
+        trampoline = .; /*定义一个名为trampoline的符号，并将当前地址计数器赋值给它*/
         *(.text.trampoline);
         . = ALIGN(4K);
 		_strampoline = .;

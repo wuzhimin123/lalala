@@ -5,7 +5,7 @@ void os_main()
 {
    // printk("hello timer os!\n");
 
-   // 内存分配器初始化
+   // 内存分配器初始化（栈式内存分配，指定128m为可分配内存，current 和 end 对应kernelend和phystop）
    frame_alloctor_init();
    
    //初始化内存

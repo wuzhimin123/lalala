@@ -57,7 +57,9 @@ void proc_mapstacks(PageTable* kpgtbl)
     char *pa = (char*)phys_addr_from_phys_page_num(kalloc()).value;
     if(pa == 0)
       panic("kalloc");
-    /*分配时会分配两页，一页是内核栈，一页是保护，具体那一页是内核栈，由本函数最后的赋值决定*/
+    /*分配时会分配两页，一页是内核栈，一页是保护，具体哪一页是内核栈，由本函数最后的赋值决定*/
+    /*这里每个任务的内核栈的虚拟地址是不同的，为什么不能映射到同一个虚拟地址，毕竟物理地址也不同啊？*/
+    /*因为内核栈要在内核地址空间访问，内核地址空间只有一个，不像每个app有各自的地址空间，不同的虚拟地址才能访问不同的物理页(栈)*/
     u64 va = KSTACK((int) (p - tasks));
     PageTable_map(kpgtbl, virt_addr_from_size_t(va), phys_addr_from_size_t((u64)pa), \
                   PAGE_SIZE, PTE_R | PTE_W);
