@@ -15,10 +15,11 @@ uint8_t UserStack[MAX_TASKS][USER_STACK_SIZE]={0};
 struct TaskControlBlock tasks[MAX_TASKS];
 
 /*返回一个TaskContext结构体，s0——s11寄存器需要被调用者保存*/
-struct TaskContext tcx_init(reg_t kstack_ptr)
+struct TaskContext tcx_init(reg_t kstack_ptr,u64 kernel_satp_new)
 {
     struct TaskContext task_ctx;
     /*ra的值设为trap_return，第一次swtich中ret返回__restore，然后回到用户态*/
+    task_ctx.satp = kernel_satp_new;
     task_ctx.ra = trap_return;
     /*sp指向应用上下文*/
     task_ctx.sp = kstack_ptr;
@@ -91,9 +92,11 @@ void proc_pagetable(struct TaskControlBlock *p)
                 PAGE_SIZE, PTE_R | PTE_W );
     //确定应用的根页表，因为pagetable里存放着根页表号
     p->pagetable = pagetable;
+    //为每个进程分配内核页表
+    p->kernelpagetable = kvminit_newpgtbl();
 }
 
-/*为应用程序创建根页表，映射trapoline和trap上下文存放地址*/
+/*为应用程序创建用户根页表，映射trapoline和trap上下文存放地址*/
 TaskControlBlock *task_create_pt(size_t app_id)
 {
     if(_top < MAX_TASKS)
@@ -138,6 +141,10 @@ void app_init(size_t app_id)
     //trap_cx_ppn是已经分配的物理内存页，这个代码的意思是
     // 将cx_ptr指向TrapContext结构体，也就是指向已经分配的物理内存页，那么TrapContext便会在分配的内存中创建
     TrapContext* cx_ptr = tasks[app_id].trap_cx_ppn;
+    //为进程分配内核页表：start
+    u64 kernel_satp_new;
+    kernel_satp_new = MAKE_SATP(tasks[app_id].kernelpagetable.root_ppn.value);
+    //end
     reg_t sstatus = r_sstatus();
     // 设置 sstatus 寄存器第8位即SPP位为0 表示为U模式
     sstatus &= (0U << 8);
@@ -149,18 +156,19 @@ void app_init(size_t app_id)
     // 设置用户栈虚拟地址
     cx_ptr->sp = tasks[app_id].ustack;
     // 设置内核页表token
-    cx_ptr->kernel_satp = kernel_satp;
+    cx_ptr->kernel_satp = kernel_satp_new;
     // 设置内核栈虚拟地址
     cx_ptr->kernel_sp = tasks[app_id].kstack;
     // 设置内核trap_handler的地址
     cx_ptr->trap_handler = (u64)trap_handler;
 
     /* 构造每个任务任务控制块中的任务上下文，设置 ra 寄存器为 trap_return 的入口地址*/
-    tasks[app_id].task_context = tcx_init((reg_t)tasks[app_id].kstack);
+    tasks[app_id].task_context = tcx_init((reg_t)tasks[app_id].kstack, kernel_satp_new);
     // 初始化 TaskStatus 字段为 Ready
     tasks[app_id].task_state = Ready;
     //分配pid
     tasks[app_id].pid = allocpid();
+
 }
 
 /* 返回当前执行的应用程序的trap上下文的地址 */
@@ -198,14 +206,17 @@ void schedule()
     /*轮转调度*/
     int next = _current + 1;
     next = next % _top;
-    // tasks[_current].task_state = Ready;
-    /*Ready才可以切换*/
+    /*判断切换*/
     if(tasks[next].task_state == Ready || tasks[next].task_state == Running)
     {
         struct TaskContext *current_task_cx_ptr = &(tasks[_current].task_context);
         struct TaskContext *next_task_cx_ptr = &(tasks[next].task_context);
         tasks[next].task_state = Running;
         _current = next;
+        /*切换下个任务的内核根页表*/    
+        w_satp(tasks[next].task_context.satp);
+        // flush stale entries from the TLB.
+        sfence_vma();//第二次清空TLB是第一次清空和satp切换内容之间可能存在页表映射查找,MMU会在快表中记录
         __switch(current_task_cx_ptr,next_task_cx_ptr);
     }
 }
@@ -259,6 +270,8 @@ int __sys_fork()
     uvmcopy(&p->pagetable,&np->pagetable,p->base_size);
     //拷贝父进程trap页数据
     memcpy((void*)np->trap_cx_ppn,(void*)p->trap_cx_ppn,PAGE_SIZE);
+    //拷贝到进程的内核根页表
+    kvmcopymappings(np->pagetable,np->kernelpagetable,0,p->base_size);
     TrapContext *cx_ptr = np->trap_cx_ppn;
     //子进程返回0，修改应用内核栈的a0，后面restore恢复到a0寄存器中返回0
     cx_ptr->a0 = 0;
@@ -269,8 +282,9 @@ int __sys_fork()
     np->base_size = p->base_size;
     np->parent = p;
     np->ustack = p->ustack;
+    np->kernelpagetable = p->kernelpagetable;
     //设置子进程返回地址和内核栈
-    np->task_context = tcx_init((reg_t)np->kstack);
+    np->task_context = tcx_init((reg_t)np->kstack,MAKE_SATP(np->kernelpagetable.root_ppn.value));
 
     _top++;
     return np->pid;
@@ -286,8 +300,8 @@ int exec(const char* name)
     elf_check(ehdr);
     //获取当前进程
     struct TaskControlBlock* proc = current_proc();
-    //保存旧的页表
-    PageTable old_pagetable = proc->pagetable;
+    //保存旧的页表（这里修改为进程内核根页表）
+    PageTable old_pagetable = proc->kernelpagetable;
     //旧进程用到的内存大小
     u64 oldsz = proc->base_size;
     //在原来进程中重新分配页表
@@ -312,6 +326,7 @@ int exec(const char* name)
     // cx_ptr->kernel_sp = proc->kstack;
     // //trap_handler地址
     // cx_ptr->trap_handler = (u64)trap_handler;
+    kvmcopymappings(proc->pagetable, proc->kernelpagetable, 0, proc->base_size);
     //释放旧应用程序旧页表
     proc_freepagetable(&old_pagetable,oldsz);
     printk("sys_exec\n");
@@ -329,6 +344,13 @@ void freeproc(struct TaskControlBlock *p)
     p->entry = 0;
     p->task_state = UnInit;
     p->exit_code = 0;
+    /*释放内核栈页*/
+    void *kstack_num = (void*)phys_page_num_from_virt_addr(p->kernelpagetable, p->kstack);
+    kfree(kstack_num);
+    p->kstack = 0;
+    /*释放进程的内核根页表*/
+    freewalk_kernel(p->kernelpagetable.root_ppn);
+    p->kernelpagetable.root_ppn.value = 0;
 }
 
 void exit_current_and_run_next(u64 exit_code)

@@ -62,6 +62,12 @@ uint64_t size_t_from_virt_page_num(VirtPageNum v) {
     return v.value;
 }
 
+PhysPageNum phys_page_num_from_virt_addr(PageTable kernel_pagetable,uint64_t v)
+{
+    
+    return ;
+}
+
 /* 物理地址向下取整 比如4098/4096=1，那就是物理页1号*/
 PhysPageNum floor_phys(PhysAddr phys_addr) {
     PhysPageNum phys_page_num;
@@ -333,6 +339,95 @@ void PageTable_map(PageTable* pt,VirtAddr va,PhysAddr pa,u64 size,uint8_t pteflg
     }
     
 }
+/*新加内容start*/
+uint64_t *
+walk(uint64_t * pagetable, uint64_t va, int alloc)
+{
+  if(va >= MAXVA)
+    panic("walk");
+
+  for(int level = 2; level > 0; level--) {
+    uint64_t *pte = &pagetable[PX(level, va)];
+    if(*pte & PTE_V) {
+      pagetable = (uint64_t *)PTE2PA(*pte);
+    } else {
+        PhysAddr addr =  phys_addr_from_phys_page_num(kalloc());
+      if(!alloc || (pagetable = (uint64_t*)addr.value == 0))
+        return 0;
+      memset(pagetable, 0, PAGE_SIZE);
+      *pte = PA2PTE(pagetable) | PTE_V;
+    }
+  }
+  return &pagetable[PX(0, va)];
+}
+
+int
+mappages(PageTable pagetable, uint64_t va, uint64_t size, uint64_t pa, int perm)
+{
+  uint64_t a, last;
+  PageTableEntry *pte;
+
+  a = PGROUNDDOWN(va);
+  last = PGROUNDDOWN(va + size - 1);
+  for(;;){
+    if((pte = walk(pagetable.root_ppn.value, a, 1)) == 0)
+      return -1;
+    if(pte->bits & PTE_V)
+      panic("remap");
+    pte->bits = PA2PTE(pa) | perm | PTE_V;
+    if(a == last)
+      break;
+    a += PAGE_SIZE;
+    pa += PAGE_SIZE;
+  }
+  return 0;
+}
+
+int
+kvmcopymappings(PageTable src, PageTable dst, uint64_t start, uint64_t sz)
+{
+  PageTableEntry *pte;
+  u64 pa, i;
+  u32 flags;
+
+  // PGROUNDUP: prevent re-mapping already mapped pages (eg. when doing growproc)
+  for(i = PGROUNDUP(start); i < start + sz; i += PAGE_SIZE){
+    if((pte = walk(src.root_ppn.value, i, 0)) == 0)
+      panic("kvmcopymappings: pte should exist");
+    if((pte->bits & PTE_V) == 0)
+      panic("kvmcopymappings: page not present");
+    pa = PTE2PA(pte->bits);
+    // `& ~PTE_U` 表示将该页的权限设置为非用户页
+    // 必须设置该权限，RISC-V 中内核是无法直接访问用户页的。
+    flags = PTE_FLAGS(pte->bits) & ~PTE_U;
+    if(mappages(dst, i, PAGE_SIZE, pa, flags) != 0){
+      goto err;
+    }
+  }
+
+  return 0;
+
+ err:
+  // thanks @hdrkna for pointing out a mistake here.
+  // original code incorrectly starts unmapping from 0 instead of PGROUNDUP(start)
+  uvmunmap(&dst, floor_virts(virt_addr_from_size_t(start)), (i - PGROUNDUP(start)) / PAGE_SIZE, 0);
+  return -1;
+}
+
+uint64_t
+kvmdealloc(uint64_t* pagetable, uint64_t oldsz, uint64_t newsz)
+{
+  if(newsz >= oldsz)
+    return oldsz;
+
+  if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
+    int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PAGE_SIZE;
+    uvmunmap(pagetable, virt_page_num_from_size_t(newsz), npages, 0);
+  }
+
+  return newsz;
+}
+/*end*/
 
 /*将一个旧的根页表的内容拷贝到一个新的根页表上，页表上找到的物理页的内容也全部拷贝并实现相同的映射*/
 int uvmcopy(PageTable *old, PageTable *new, u64 sz)
@@ -414,6 +509,26 @@ void freewalk(PhysPageNum ppn)
     kfree(ppn); 
 }
 
+void freewalk_kernel(PhysPageNum ppn)
+{
+    for (int i = 0; i < 512; i++)
+    {
+        PageTableEntry* pte =  &get_pte_array(ppn)[i];
+        //printk("i:%d ",i);
+        //一是有效位为 1，即该页表项有效；二是不包含任何读写执行权限标志，即它是一个中间级页表项
+        if((pte->bits & PTE_V) && (pte->bits & (PTE_R|PTE_W|PTE_X)) == 0)
+        {
+            //取出下一级页表的页号
+            //printk("pte->bits:%x\n",pte->bits);
+            PhysPageNum child_ppn = PageTableEntry_ppn(pte);
+            //printk("child ppn:%d\n",child_ppn.value);
+            freewalk_kernel(child_ppn);
+            *pte = PageTableEntry_empty();
+        }
+        
+    }
+    kfree(ppn); 
+}
 /*取消映射，释放页表占用的物理空间*/
 void uvmfree(PageTable *pt, u64 sz)
 {
@@ -445,24 +560,51 @@ void PageTable_unmap(PageTable* pt,VirtPageNum vpn)
 }
 
 /*内核恒等映射，得到映射的根页表*/
-PageTable kvmmake(void)
+// PageTable kvmmake(void)
+// {
+//     PageTable pt;
+//     //分配一个空闲页表作为根页表(一级页表)
+//     PhysPageNum root_ppn = kalloc();
+//     pt.root_ppn = root_ppn;
+//     //实现内核text段恒等映射,可读可执行,u模式不可访问。(etext在链接脚本文件中定义)
+//     PageTable_map(&pt,virt_addr_from_size_t(KERNBASE),phys_addr_from_size_t(KERNBASE), \
+//                     (u64)etext - KERNBASE, PTE_R|PTE_X);
+//     printk("finish kernel text map!\n");
+//     //实现内核data段和空闲内存恒等映射，可读可写，u模式不可访问
+//     PageTable_map(&pt,virt_addr_from_size_t((u64)etext),phys_addr_from_size_t((u64)etext), \
+//                     PHYSTOP - (u64)etext, PTE_R|PTE_W);
+//     //trapoline地址映射
+//     PageTable_map(&pt, virt_addr_from_size_t(TRAMPOLINE), phys_addr_from_size_t((u64)trampoline), \
+//                     PAGE_SIZE, PTE_R | PTE_X );
+//     /*为每个进程分配内核栈*/
+//     proc_mapstacks(&pt);
+//     return pt;
+// }
+
+void kvm_map_pagetable(PageTable pagetable)
+{
+    //实现内核text段恒等映射,可读可执行,u模式不可访问。(etext在链接脚本文件中定义)
+    PageTable_map(&pagetable,virt_addr_from_size_t(KERNBASE),phys_addr_from_size_t(KERNBASE), \
+                    (u64)etext - KERNBASE, PTE_R|PTE_X);
+    printk("finish kernel text map!\n");
+    //实现内核data段和空闲内存恒等映射，可读可写，u模式不可访问
+    PageTable_map(&pagetable,virt_addr_from_size_t((u64)etext),phys_addr_from_size_t((u64)etext), \
+                    PHYSTOP - (u64)etext, PTE_R|PTE_W);
+    //trapoline地址映射
+    PageTable_map(&pagetable, virt_addr_from_size_t(TRAMPOLINE), phys_addr_from_size_t((u64)trampoline), \
+                    PAGE_SIZE, PTE_R | PTE_X );
+    /*为每个进程分配内核栈*/
+    proc_mapstacks(&pagetable);
+}
+
+PageTable kvminit_newpgtbl()
 {
     PageTable pt;
     //分配一个空闲页表作为根页表(一级页表)
     PhysPageNum root_ppn = kalloc();
     pt.root_ppn = root_ppn;
-    //实现内核text段恒等映射,可读可执行,u模式不可访问。(etext在链接脚本文件中定义)
-    PageTable_map(&pt,virt_addr_from_size_t(KERNBASE),phys_addr_from_size_t(KERNBASE), \
-                    (u64)etext - KERNBASE, PTE_R|PTE_X);
-    printk("finish kernel text map!\n");
-    //实现内核data段和空闲内存恒等映射，可读可写，u模式不可访问
-    PageTable_map(&pt,virt_addr_from_size_t((u64)etext),phys_addr_from_size_t((u64)etext), \
-                    PHYSTOP - (u64)etext, PTE_R|PTE_W);
-    //trapoline地址映射
-    PageTable_map(&pt, virt_addr_from_size_t(TRAMPOLINE), phys_addr_from_size_t((u64)trampoline), \
-                    PAGE_SIZE, PTE_R | PTE_X );
-    /*为每个进程分配内核栈*/
-    proc_mapstacks(&pt);
+    kvm_map_pagetable(pt);
+
     return pt;
 }
 
@@ -472,7 +614,7 @@ PageTable kernel_pagetable;
 u64 kernel_satp;
 void kvminit()
 {
-    kernel_pagetable = kvmmake();
+    kernel_pagetable = kvminit_newpgtbl();
     kernel_satp = MAKE_SATP(kernel_pagetable.root_ppn.value);
 }
 
@@ -491,6 +633,7 @@ void kvminithart()
     reg_t satp = r_satp();
 
 }
+
 // void frame_allocator_test()
 // {
 //     PhysPageNum frame[10];

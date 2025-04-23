@@ -36,9 +36,13 @@
 
 #define PGROUNDUP(sz)  (((sz)+PAGE_SIZE-1) & ~(PAGE_SIZE-1))
 #define PGROUNDDOWN(a) (((a)) & ~(PAGE_SIZE-1))
-
+#define PA2PTE(pa) ((((uint64_t)pa) >> 12) << 10)
 #define PTE2PA(pte) (((pte) >> 10) << 12)
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
+#define PGSHIFT 12
+#define PXMASK          0x1FF // 9 bits
+#define PXSHIFT(level)  (PGSHIFT+(9*(level)))
+#define PX(level, va) ((((uint64_t) (va)) >> PXSHIFT(level)) & PXMASK)
 /* 物理地址 */
 typedef struct {
     uint64_t value; 
@@ -85,7 +89,9 @@ typedef struct {
 
 
 void frame_alloctor_init();
-void kvminit();
+// void kvminit();
+PageTable kvminit_newpgtbl();
+void kvm_map_pagetable(PageTable pagetable);
 void kvminithart();
 PhysPageNum kalloc(void);
 void PageTable_map(PageTable* pt,VirtAddr va, PhysAddr pa, u64 size ,uint8_t pteflgs);

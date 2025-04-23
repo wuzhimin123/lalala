@@ -51,7 +51,7 @@ __alltraps:
     #读取sscratch中的用户栈地址，保存到trap上下文
     csrr t2,sscratch
     sd t2,2*8(sp)
-    #载入内核地址空间的token
+    #载入进程独有的内核地址空间的token
     ld t0, 34*8(sp)
     #载入traphandler入口点地址
     ld t1, 36*8(sp)

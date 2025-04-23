@@ -154,5 +154,7 @@ void load_app(size_t app_id)
     //记录APP程序的入口地址，为 main 函数地址
     proc->entry = (u64)ehdr->e_entry;
     //映射应用程序用户栈开始地址
-    proc_ustack(proc);       
+    proc_ustack(proc);
+    //每个app加载时把应用空间映射到内核空间
+    kvmcopymappings(proc->pagetable, proc->kernelpagetable, 0, proc->base_size);       
 }

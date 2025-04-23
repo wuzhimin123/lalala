@@ -23,6 +23,7 @@ typedef struct TaskControlBlock
     u64  ustack;                //应用用户栈的虚拟地址
     u64  entry;                 //应用程序入口地址
     PageTable pagetable;        //应用页表所在物理页
+    PageTable kernelpagetable;  //内核页表
     u64 exit_code;              //进程退出码
 }TaskControlBlock;
 

@@ -64,6 +64,7 @@ typedef struct TaskContext
 	reg_t s9;
 	reg_t s10;
 	reg_t s11;
+	reg_t satp;//写在最后，因为前面的变量会用来保存保存任务上下文，放在后面再switch中不会被覆盖
 }TaskContext;
 
 

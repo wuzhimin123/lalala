@@ -32,8 +32,9 @@ void __sys_write(size_t fd, const char* data, size_t len)
     if(fd == stdout || fd == stderr)
     {
         //printk(" ");
-        char* str = translated_byte_buffer(data);
-        printk("%s",str);
+        /*不在需要软件转换，交给mmu*/
+        // char* str = translated_byte_buffer(data);
+        printk("%s",data);
     }
     else
     {
