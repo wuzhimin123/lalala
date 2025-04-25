@@ -85,6 +85,14 @@ static inline reg_t r_mtime()
   return x;
 }
 
+/*读sp寄存器的值*/
+static inline uint64_t r_sp()
+{
+  uint64_t x;
+  asm volatile("mv %0, sp" : "=r" (x) );
+  return x;
+}
+
 static inline void w_satp(reg_t x)
 {
   asm volatile("csrw satp, %0" : : "r" (x));

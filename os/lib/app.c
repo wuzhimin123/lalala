@@ -50,6 +50,11 @@ int sys_waitpid()
 {
     return syscall(__NR_waitid,0,0,0);
 }
+
+uint64_t sys_brk(int n)
+{
+    return syscall(__NR_brk,0,n,0);
+}
 // void task_delay(volatile int count)
 // {
 //     count *=50000;

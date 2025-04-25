@@ -57,7 +57,8 @@ void __sys_read(size_t fd,const char* data,size_t len)
             schedule();
             continue;
         }
-        char *str = translated_byte_buffer(data);
+        // char *str = translated_byte_buffer(data);
+        char *str = data;
         str[0] = c;
     }
 }
@@ -88,6 +89,20 @@ int __sys_wait()
 {
     return wait();
 }
+
+uint64_t __sys_brk(int n)
+{
+    uint64_t addr;
+    struct TaskControlBlock *p = current_proc();
+    addr = p->base_size;
+    if(n < 0)
+    {
+        kvmdealloc(p->kernelpagetable, p->base_size, p->base_size + n);//n<0，释放减小内存分配
+    }
+    p->base_size += n;//baze_size增加但不分配内存
+    return addr;
+}
+
 uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {
         switch (syscall_id)
         {
@@ -111,6 +126,8 @@ uint64_t __SYSCALL(size_t syscall_id, reg_t arg1, reg_t arg2, reg_t arg3) {
             return __sys_exec(arg2);
         case __NR_waitid:
             return __sys_wait();
+        case __NR_brk:
+            return __sys_brk(arg2);
         default:
             printk("Unsupported syscall id:%d\n",syscall_id);
             break;

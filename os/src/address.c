@@ -340,78 +340,80 @@ void PageTable_map(PageTable* pt,VirtAddr va,PhysAddr pa,u64 size,uint8_t pteflg
     
 }
 /*新加内容start*/
-uint64_t *
-walk(uint64_t * pagetable, uint64_t va, int alloc)
-{
-  if(va >= MAXVA)
-    panic("walk");
+// uint64_t *
+// walk(uint64_t * pagetable, uint64_t va, int alloc)
+// {
+//   if(va >= MAXVA)
+//     panic("walk");
 
-  for(int level = 2; level > 0; level--) {
-    uint64_t *pte = &pagetable[PX(level, va)];
-    if(*pte & PTE_V) {
-      pagetable = (uint64_t *)PTE2PA(*pte);
-    } else {
-        PhysAddr addr =  phys_addr_from_phys_page_num(kalloc());
-      if(!alloc || (pagetable = (uint64_t*)addr.value == 0))
-        return 0;
-      memset(pagetable, 0, PAGE_SIZE);
-      *pte = PA2PTE(pagetable) | PTE_V;
-    }
-  }
-  return &pagetable[PX(0, va)];
-}
+//   for(int level = 2; level > 0; level--) {
+//     uint64_t *pte = &pagetable[PX(level, va)];
+//     if(*pte & PTE_V) {
+//       pagetable = (uint64_t *)PTE2PA(*pte);
+//     } else {
+//         PhysAddr addr =  phys_addr_from_phys_page_num(kalloc());
+//       if(!alloc || (pagetable = (uint64_t*)addr.value == 0))
+//         return 0;
+//       memset(pagetable, 0, PAGE_SIZE);
+//       *pte = PA2PTE(pagetable) | PTE_V;
+//     }
+//   }
+//   return &pagetable[PX(0, va)];
+// }
 
-int
-mappages(PageTable pagetable, uint64_t va, uint64_t size, uint64_t pa, int perm)
-{
-  uint64_t a, last;
-  PageTableEntry *pte;
+// int
+// mappages(PageTable pagetable, uint64_t va, uint64_t size, uint64_t pa, int perm)
+// {
+//   uint64_t a, last;
+//   PageTableEntry *pte;
 
-  a = PGROUNDDOWN(va);
-  last = PGROUNDDOWN(va + size - 1);
-  for(;;){
-    if((pte = walk(pagetable.root_ppn.value, a, 1)) == 0)
-      return -1;
-    if(pte->bits & PTE_V)
-      panic("remap");
-    pte->bits = PA2PTE(pa) | perm | PTE_V;
-    if(a == last)
-      break;
-    a += PAGE_SIZE;
-    pa += PAGE_SIZE;
-  }
-  return 0;
-}
+//   a = PGROUNDDOWN(va);
+//   last = PGROUNDDOWN(va + size - 1);
+//   for(;;){
+//     if((pte = walk(pagetable.root_ppn.value, a, 1)) == 0)
+//       return -1;
+//     if(pte->bits & PTE_V)
+//       panic("remap");
+//     pte->bits = PA2PTE(pa) | perm | PTE_V;
+//     if(a == last)
+//       break;
+//     a += PAGE_SIZE;
+//     pa += PAGE_SIZE;
+//   }
+//   return 0;
+// }
 
 int
 kvmcopymappings(PageTable src, PageTable dst, uint64_t start, uint64_t sz)
 {
   PageTableEntry *pte;
   u64 pa, i;
-  u32 flags;
+//   u32 flags;
 
   // PGROUNDUP: prevent re-mapping already mapped pages (eg. when doing growproc)
   for(i = PGROUNDUP(start); i < start + sz; i += PAGE_SIZE){
-    if((pte = walk(src.root_ppn.value, i, 0)) == 0)
+    if((pte = find_pte(src.root_ppn.value,floor_virts(virt_addr_from_size_t(i)))) == 0)
       panic("kvmcopymappings: pte should exist");
     if((pte->bits & PTE_V) == 0)
       panic("kvmcopymappings: page not present");
     pa = PTE2PA(pte->bits);
-    // `& ~PTE_U` 表示将该页的权限设置为非用户页
-    // 必须设置该权限，RISC-V 中内核是无法直接访问用户页的。
-    flags = PTE_FLAGS(pte->bits) & ~PTE_U;
-    if(mappages(dst, i, PAGE_SIZE, pa, flags) != 0){
-      goto err;
-    }
+    // flags = PTE_FLAGS(pte->bits) & ~PTE_U;
+    /*mappages(dst, i, PAGE_SIZE, pa, flags)*/
+
+    /*`& ~PTE_U` 表示将该页的权限设置为非用户页
+     必须设置该权限，RISC-V 中内核是无法直接访问用户页的。*/
+    PageTable_map(&dst,virt_addr_from_size_t(i),phys_addr_from_size_t(pa),PAGE_SIZE,~PTE_U);
+    //   goto err;
+    
   }
 
   return 0;
 
- err:
-  // thanks @hdrkna for pointing out a mistake here.
-  // original code incorrectly starts unmapping from 0 instead of PGROUNDUP(start)
-  uvmunmap(&dst, floor_virts(virt_addr_from_size_t(start)), (i - PGROUNDUP(start)) / PAGE_SIZE, 0);
-  return -1;
+//  err:
+//   // thanks @hdrkna for pointing out a mistake here.
+//   // original code incorrectly starts unmapping from 0 instead of PGROUNDUP(start)
+//   uvmunmap(&dst, floor_virts(virt_addr_from_size_t(start)), (i - PGROUNDUP(start)) / PAGE_SIZE, 0);
+//   return -1;
 }
 
 uint64_t
@@ -456,7 +458,7 @@ int uvmcopy(PageTable *old, PageTable *new, u64 sz)
         }
     }
 }
-//取消多页映射(释放物理页)，从vpn开始，取消npages个页的映射
+//将多页内存物理页从三级页表中清空(解除映射)(释放物理页)，从vpn开始，取消npages个页的映射，并没有遍历取消中间页表的映射
 void uvmunmap(PageTable* pt,VirtPageNum vpn,u64 npages,int do_free)
 {
     PageTableEntry *pte;
@@ -482,7 +484,7 @@ void uvmunmap(PageTable* pt,VirtPageNum vpn,u64 npages,int do_free)
     }
 }
 
-/* 解除页表映射关系，释放内存*/
+/* 解除一个页表映射关系，释放物理页，但不处理叶子页表项(中间页的映射会解除)*/
 void freewalk(PhysPageNum ppn)
 {
     for (int i = 0; i < 512; i++)
@@ -632,6 +634,15 @@ void kvminithart()
     sfence_vma();//第二次清空TLB是第一次清空和satp切换内容之间可能存在页表映射查找,MMU会在快表中记录
     reg_t satp = r_satp();
 
+}
+/*判断该虚拟地址是否是懒分配*/
+int uvmshouldtouch(uint64_t va)
+{
+    PageTableEntry *pte;
+    struct TaskControlBlock *p = current_proc();
+    return va < p->base_size 
+        && PGROUNDDOWN(va)!=r_sp()//va不是栈的保护页
+        && (pte = find_pte(p,virt_page_num_from_size_t(va)) == NULL) || ((pte->bits & PTE_V) == 0);//找不到对应页表项或页表项无效
 }
 
 // void frame_allocator_test()

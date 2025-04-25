@@ -32,6 +32,26 @@ void trap_handler()
 			set_next_trigger();
 			schedule();//中断发生则切换任务
 			break;
+		/*缺页异常*/
+		case 13:/*加载页错误*/
+		case 15:/*存储页错误*/
+			uint64_t va = r_stval();
+			/*懒分配导致*/
+			if(uvmshouldtouch())
+			{
+				struct TaskControlBlock *p = current_proc();
+				PhysPageNum mem = kalloc();
+				PageTable_map(&p->pagetable,virt_addr_from_size_t(va),
+					phys_addr_from_phys_page_num(mem), PAGE_SIZE, 
+					PTE_R | PTE_W | PTE_U | PTE_X);
+				break;
+			}
+			else
+			{
+				/*杀死进程*/
+				break;
+			}
+			break;
 		default:
 			printk("undfined scause:%d\n",scause);
 			break;
