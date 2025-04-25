@@ -3,6 +3,8 @@ extern char etext[];
 extern char kernelend[];
 extern char trampoline[];
 
+
+
 /*u64转化为物理地址*/
 PhysAddr phys_addr_from_size_t(uint64_t v)
 {
@@ -247,14 +249,20 @@ void indexes(VirtPageNum vpn,size_t* result)
 PhysPageNum kalloc(void)
 {
     PhysPageNum frame =  StackFrameAllocator_alloc(&FrameAllocatorImpl);
+    PhysAddr addr = phys_addr_from_phys_page_num(frame);
+    PA2PGREF(addr.value) = 1; //引用计数为1
     //printk("frame:%d\n",frame.value);
     return frame;
 }
 
-/* 释放一页内存 */
+/* 引用计数<=1时释放一页内存 */
 void kfree(PhysPageNum ppn)
-{
-    StackFrameAllocator_dealloc(&FrameAllocatorImpl,ppn);
+{   
+    PhysAddr addr = phys_addr_from_phys_page_num(ppn);
+    if(--PA2PGREF(addr.value) <= 0)
+        StackFrameAllocator_dealloc(&FrameAllocatorImpl,ppn);
+    else
+        printk("kfree failed!");
 }
 
 //根据虚拟地址和一级页表索引到三级页表的页表项(索引不到可自行创建，因此即使根页表为空也可实现映射)
@@ -431,7 +439,10 @@ kvmdealloc(uint64_t* pagetable, uint64_t oldsz, uint64_t newsz)
 }
 /*end*/
 
+
+
 /*将一个旧的根页表的内容拷贝到一个新的根页表上，页表上找到的物理页的内容也全部拷贝并实现相同的映射*/
+/*现在只映射不copy*/
 int uvmcopy(PageTable *old, PageTable *new, u64 sz)
 {
     PageTableEntry *pte;
@@ -446,15 +457,21 @@ int uvmcopy(PageTable *old, PageTable *new, u64 sz)
             //pte转化为物理地址，也就是父进程已分配的物理页的起始地址
             u64 phyaddr = PTE2PA(pte->bits);
             flags = PTE_FLAGS(pte->bits);
+            if(pte->bits & PTE_W)
+                pte->bits = (pte->bits & ~PTE_W) | PTE_COW;//清除父进程PTE_W标志位（父子进程映射到同样的物理页，防止写互相冲突），标识为写时复制页
+            /*写时复制机制，以下分配内存，从父进程复制不再需要 */
             //分配一页内存
-            PhysPageNum ppn = kalloc();
+            // PhysPageNum ppn = kalloc();
             //ppn转化为物理内存，也就是子进程新分配的物理页的起始地址
-            u64 paddr = phys_addr_from_phys_page_num(ppn).value;
+            // u64 paddr = phys_addr_from_phys_page_num(ppn).value;
             //将旧页的内容拷贝到新页
-            memcpy((void*)paddr,(void*)phyaddr,PAGE_SIZE);
+            // memcpy((void*)paddr,(void*)phyaddr,PAGE_SIZE);
             //映射新物理页到new页表
+            
             PageTable_map(new,virt_addr_from_size_t(i), \
-                            phys_addr_from_size_t(paddr),PAGE_SIZE,flags);
+                            phys_addr_from_size_t(phyaddr),PAGE_SIZE,flags);
+            /*引用计数+1*/
+            krefpage((void*)phyaddr);
         }
     }
 }
@@ -640,35 +657,18 @@ int uvmshouldtouch(uint64_t va)
 {
     PageTableEntry *pte;
     struct TaskControlBlock *p = current_proc();
-    return va < p->base_size 
+    return va < p->base_size //在进程内存范围中
         && PGROUNDDOWN(va)!=r_sp()//va不是栈的保护页
         && (pte = find_pte(p,virt_page_num_from_size_t(va)) == NULL) || ((pte->bits & PTE_V) == 0);//找不到对应页表项或页表项无效
 }
 
-// void frame_allocator_test()
-// {
-//     PhysPageNum frame[10];
-//     StackFrameAllocator_new(&FrameAllocatorImpl);
-//     StackFrameAllocator_init(&FrameAllocatorImpl, \
-//             floor_phys(phys_addr_from_size_t(MEMORY_START)), \
-//             ceil_phys(phys_addr_from_size_t(MEMORY_END)));
-//     printk("Memoery start:%d\n",floor_phys(phys_addr_from_size_t(MEMORY_START)));
-//     printk("Memoery end:%d\n",ceil_phys(phys_addr_from_size_t(MEMORY_END)));
-//     for (size_t i = 0; i < 5; i++)
-//     {
-//          frame[i] = StackFrameAllocator_alloc(&FrameAllocatorImpl);
-//          printk("frame id:%d\n",frame[i].value);
-//     }
-//     for (size_t i = 0; i < 5; i++)
-//     {
-//         StackFrameAllocator_dealloc(&FrameAllocatorImpl,frame[i]);
-//         printk("allocator->recycled.data.value:%d\n",FrameAllocatorImpl.recycled.data[i]);
-//         printk("frame id:%d\n",frame[i].value);
-//     }
-//     PhysPageNum frame_test[10];
-//     for (size_t i = 0; i < 5; i++)
-//     {
-//          frame[i] = StackFrameAllocator_alloc(&FrameAllocatorImpl);
-//         printk("frame id:%d\n",frame[i].value);
-//     }
-// }
+/*判断该虚拟地址是否是写时复制*/
+int uvmcheckcowpage(uint64_t va)
+{
+    PageTableEntry *pte;
+    struct TaskControlBlock *p = current_proc();
+    return va < p->base_size //在进程内存范围中
+        && (pte->bits & PTE_V)//页表项存在
+        && (pte->bits & PTE_COW) //写时复制标识
+        && (pte = find_pte(p,virt_page_num_from_size_t(va)));//页表项有效(映射到了父进程的物理页)
+}

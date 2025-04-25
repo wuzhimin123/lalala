@@ -44,12 +44,46 @@ void trap_handler()
 				PageTable_map(&p->pagetable,virt_addr_from_size_t(va),
 					phys_addr_from_phys_page_num(mem), PAGE_SIZE, 
 					PTE_R | PTE_W | PTE_U | PTE_X);
-				break;
+				/*别忘了映射到进程内核页表*/
+				kvmcopymappings(p->pagetable,p->kernelpagetable,va,PAGE_SIZE);
+			}
+			/*写时复制导致*/
+			else if(uvmcheckcowpage(r_stval()))
+			{
+				// uvmcowcopy(r_stval());
+				PageTableEntry *pte;
+				struct TaskControlBlock *p = current_proc();
+				if((pte->bits = find_pte(p->pagetable,virt_page_num_from_size_t(va))) == NULL)//va对应的页表项为空
+					panic("uvmcowcopy: find_pte");
+
+				uint64_t pa = PTE2PA(pte->bits);
+				uint64_t new;
+
+				if(PA2PGREF(pa) <= 1)//引用计数小于1，无需复制
+					new = pa;
+				else//否则把父进程的物理页复制到新分配的物理页
+				{
+					new = size_t_from_phys_page_num(kalloc());
+					memcpy((void*)new,(void*)pa,PAGE_SIZE);
+					PA2PGREF(pa)--;//引用计数-1
+				}
+				/*取消对原物理页的映射，无论父子进程,重新映射*/
+				uint8_t flags = (PTE_FLAGS(pte->bits) & PTE_W) | ~PTE_COW;//重新映射为可写，清除PTE_COW标志位
+				uvmunmap(&p->pagetable,floor_virts(virt_addr_from_size_t(va)),1,0);
+				PageTable_map(&p->pagetable,virt_addr_from_size_t(va),
+					phys_addr_from_size_t(new), PAGE_SIZE, flags);
+				/*别忘了映射到进程内核页表*/
+				kvmcopymappings(p->pagetable,p->kernelpagetable,va,PAGE_SIZE);
+				// PhysPageNum ppn = kalloc();
+            	//ppn转化为物理内存，也就是子进程新分配的物理页的起始地址
+            	// u64 paddr = phys_addr_from_phys_page_num(ppn).value;
+            	//将旧页的内容拷贝到新页
+            	// memcpy((void*)paddr,(void*)phyaddr,PAGE_SIZE);
+				
 			}
 			else
 			{
 				/*杀死进程*/
-				break;
 			}
 			break;
 		default:

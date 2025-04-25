@@ -241,7 +241,7 @@ struct TaskControlBlock* allocproc()
 {
     struct TaskControlBlock *p;
     //任务列表放着MAX_TASKS多个任务，只不过是有些没有"激活"，
-    // 这里拿到一个没有激活的任务作为新任务
+    // 这里拿到一个没有激活的任务作为新任务，这里把创建的任务加入到任务列表中(创建任务指针，指向任务列表的一个未初始化的任务)
     for(p = tasks;p < &tasks[MAX_TASKS];p++)
     {
         if(p->task_state == UnInit)
@@ -263,10 +263,10 @@ int __sys_fork()
 {
     struct TaskControlBlock *np;
     struct TaskControlBlock *p = current_proc();
-
+    /*allocproc很关键，我们创建了np，但是并不在任务列表里，如何调度呢，通过allocproc加进来*/
     if((np = allocproc()) == 0)
         return -1;
-    //拷贝父进程内存数据
+    //拷贝父进程，将父进程用户根页表映射关系复制过来
     uvmcopy(&p->pagetable,&np->pagetable,p->base_size);
     //拷贝父进程trap页数据
     memcpy((void*)np->trap_cx_ppn,(void*)p->trap_cx_ppn,PAGE_SIZE);
@@ -277,7 +277,7 @@ int __sys_fork()
     cx_ptr->a0 = 0;
     //在trap页中设置子进程内核栈，因为之前是复制的父进程的
     cx_ptr->kernel_sp = np->kstack;
-    //复制TCB的信息
+    //复制TCB的信息,这里拷贝的是虚拟地址，但映射到的物理内存页不同
     np->entry = p->entry;
     np->base_size = p->base_size;
     np->parent = p;

@@ -43,6 +43,8 @@
 #define PXMASK          0x1FF // 9 bits
 #define PXSHIFT(level)  (PGSHIFT+(9*(level)))
 #define PX(level, va) ((((uint64_t) (va)) >> PXSHIFT(level)) & PXMASK)
+
+
 /* 物理地址 */
 typedef struct {
     uint64_t value; 
@@ -79,12 +81,17 @@ typedef struct
 #define PTE_G (1 << 5)   //全局映射
 #define PTE_A (1 << 6)   //访问标志位
 #define PTE_D (1 << 7)   //脏位
+#define PTE_COW (1 << 8) //写时复制
 
 /* 定义页表 */
 typedef struct {
     PhysPageNum root_ppn; //根节点
 }PageTable;
 
+#define PA2PGREF_ID(p) (((p)-KERNBASE)/PAGE_SIZE)
+#define PGREF_MAX_ENTRIES PA2PGREF_ID(PHYSTOP)
+int pageref[PGREF_MAX_ENTRIES]; //KERNBASE到PHYSTOP之间的物理页号引用计数数组
+#define PA2PGREF(p) pageref[PA2PGREF_ID((uint64_t)(p))] //通过物理地址获得物理页的引用计数
 
 
 
